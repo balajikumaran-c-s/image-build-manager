@@ -140,6 +140,7 @@
         output_project_dir: "{{ playbook_dir }}/output/{{ standalone_config.project_name }}"
         project_name: "{{ standalone_config.project_name }}"
         admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
+        functional_groups_config_path: "{{ playbook_dir }}/output/{{ standalone_config.project_name }}/.data/functional_groups_config.yml"
         _standalone_src_dir: "{{ playbook_dir }}"
         cacheable: true
 
@@ -186,13 +187,41 @@
     groups: "{{ oim_host_group }}"
   when: not standalone_mode | bool
 
-- name: Create {{ oim_host_group }} group (standalone mode) # noqa: name[template]
+# --- Standalone: detect if running inside a container (Mode B) ---
+- name: Check if running inside a container (Mode B detection)
+  ansible.builtin.stat:
+    path: /run/.containerenv
+  register: _containerenv_check
+  when: standalone_mode | bool
+
+- name: Set container mode fact
+  ansible.builtin.set_fact:
+    _running_in_container: "{{ _containerenv_check.stat.exists | default(false) }}"
+    cacheable: true
+  when: standalone_mode | bool
+
+# Mode A (bare-metal): run tasks locally
+- name: Create {{ oim_host_group }} group (standalone — bare-metal) # noqa: name[template]
   ansible.builtin.add_host:
     hostname: "{{ oim_host_group }}"
     ansible_host: "localhost"
     ansible_connection: "local"
     groups: "{{ oim_host_group }}"
-  when: standalone_mode | bool
+  when:
+    - standalone_mode | bool
+    - not (_running_in_container | default(false) | bool)
+
+# Mode B (container): SSH to the host
+- name: Create {{ oim_host_group }} group (standalone — container, SSH to host) # noqa: name[template]
+  ansible.builtin.add_host:
+    hostname: "{{ oim_host_group }}"
+    ansible_host: "{{ admin_nic_ip }}"
+    ansible_connection: "ssh"
+    ansible_user: "root"
+    groups: "{{ oim_host_group }}"
+  when:
+    - standalone_mode | bool
+    - _running_in_container | default(false) | bool
 
 # --- Step 5: Set image build guard facts ---
 - name: Set image_build_manager guard facts

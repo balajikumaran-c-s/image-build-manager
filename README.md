@@ -108,6 +108,15 @@ Project and build host settings for standalone mode. See `config.yml.sample`.
 | `build_host.domain_name` | Domain name for the build host | `local` |
 | `build_host.admin_nic_ip` | Admin NIC IP (Pulp and S3 endpoint) | — |
 
+### `image_build_config.yml`
+
+Per-domain configuration. Key sections:
+- `s3_configurations` — S3 provider (minio or powerscale)
+- `repo_manager_output_path` — path to `repo_manager_output/` directory
+- `functional_groups` — image variants to build (e.g., `os_x86_64`, `slurm_node_x86_64`)
+- `aarch64_inventory_host_ip` — ARM build host (leave empty to skip aarch64)
+- `build_image` — async/retry/delay settings
+
 ### `repo_status.yml`
 
 Produced by `repo_manager`. Contains RPM repo URLs, OS metadata, and certificates.

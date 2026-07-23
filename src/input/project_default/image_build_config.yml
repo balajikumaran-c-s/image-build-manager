@@ -60,6 +60,39 @@ aarch64_inventory_host_ip: ""
 aarch64_ssh_user: "root"
 
 # ---------------------------------------------------------------------------
+# Functional Groups
+# ---------------------------------------------------------------------------
+# In standalone mode, functional groups are defined here instead of being
+# generated from provision_config.yml + pxe_mapping.csv.
+#
+# Each entry defines an image variant to build. The "name" must end with
+# the target architecture suffix (_x86_64 or _aarch64).
+#
+# Valid functional group names (from FUNCTIONAL_GROUP_LAYER_MAP):
+#   x86_64:  os_x86_64, slurm_node_x86_64, slurm_control_node_x86_64,
+#            service_kube_control_plane_first_x86_64,
+#            service_kube_control_plane_x86_64, service_kube_node_x86_64,
+#            login_node_x86_64, login_compiler_node_x86_64
+#   aarch64: os_aarch64, slurm_node_aarch64, login_node_aarch64,
+#            login_compiler_node_aarch64
+#
+# Uncomment the groups you need. At minimum, include "os_<arch>" for a
+# base OS image build.
+functional_groups:
+  # - name: "os_x86_64"
+  - name: "slurm_node_x86_64"
+  - name: "slurm_control_node_x86_64"
+  # - name: "service_kube_control_plane_first_x86_64"
+  # - name: "service_kube_control_plane_x86_64"
+  # - name: "service_kube_node_x86_64"
+  # - name: "login_node_x86_64"
+  # - name: "login_compiler_node_x86_64"
+  # - name: "os_aarch64"
+  # - name: "slurm_node_aarch64"
+  # - name: "login_node_aarch64"
+  # - name: "login_compiler_node_aarch64"
+
+# ---------------------------------------------------------------------------
 # Build Image Settings
 # ---------------------------------------------------------------------------
 build_image:

@@ -40,7 +40,7 @@ inside the Omnia mono-repo ecosystem. The core container is **not required**.
 ✅ library/module_utils/ — build_image/ + image_build_validation/ fully local
 ✅ credential flow       — collect_build_credentials role
 ✅ validation flow       — validate_image_build_input role + validate_image_build_config module
-✅ functional groups     — generate_functional_groups role + module
+✅ functional groups     — defined in image_build_config.yml (standalone); generate_functional_groups commented out
 ✅ tag validation        — image_build_setup role (supported_tags, skip_credential_tags, invalid_tag_combinations)
 ✅ zero ../common/       — no ansible.cfg references to ../common/ or ../playbooks/utils/
 ```
@@ -268,7 +268,9 @@ OS type/version are now read from `repo_status.yml` instead.
 | **OIM metadata needed** | **No** | **No** | **Yes** |
 | **Air-gap support** | Via local RPM mirror URLs in `repo_status.yml` | Same | Via Pulp (repo_manager) |
 | **Container lifecycle** | N/A | Long-running (sshd) — `podman exec` for tags | Long-running (sshd) |
-| **Target users** | DevOps, CI/CD, advanced users | Production, repeatable builds | Full Omnia cluster operators |
+| **OIM connection** | `ansible_connection: local` | `ansible_connection: ssh` (auto-detected via `/run/.containerenv`) | SSH to core container |
+| **Functional groups** | `image_build_config.yml` | `image_build_config.yml` | `generate_functional_groups` from CSV |
+| **Target users** | DevOps, CI/CD, advanced users | Production, repeatable builds | **NOT SUPPORTED** |
 
 ### 3.3 Mode Detection
 
@@ -314,7 +316,8 @@ RECOMMENDED ARCHITECTURE:
      - Long-running container (sshd) — user runs multiple tags via exec/SSH
      - ~300MB image (wolfi-base + ansible-core + deps + sshd)
 
-  3. NOT RECOMMENDED: Monolithic core container (Mode C)
+  3. NOT SUPPORTED: Monolithic core container (Mode C)
+     - Mode C code is guarded by `when: not standalone_mode` and will never execute
      - Creates coupling between unrelated domains
      - Can't release image_build_manager without rebuilding all of omnia_core
      - Forces all domains to share the same Ansible/Python version

@@ -179,10 +179,29 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: Generate functional groups from mapping.csv
-      ansible.builtin.include_role:
-        name: generate_functional_groups
-      when: not (enable_build_stream | default(false) | bool)
+    # --- Standalone mode: write functional groups from image_build_config.yml ---
+    - name: Write functional_groups_config.yml from image_build_config.yml (standalone)
+      when:
+        - standalone_mode | default(false) | bool
+        - not (enable_build_stream | default(false) | bool)
+      block:
+        - name: Ensure functional groups data directory exists
+          ansible.builtin.file:
+            path: "{{ functional_groups_config_path | dirname }}"
+            state: directory
+            mode: "0755"
+
+        - name: Write functional groups config from image_build_config
+          ansible.builtin.copy:
+            content: "{{ {'functional_groups': functional_groups} | to_nice_yaml }}"
+            dest: "{{ functional_groups_config_path }}"
+            mode: "0644"
+
+    # --- Omnia mode (Mode C) — NOT SUPPORTED. Kept for reference. ---
+    # - name: Generate functional groups from mapping.csv
+    #   ansible.builtin.include_role:
+    #     name: generate_functional_groups
+    #   when: not (enable_build_stream | default(false) | bool)
 
     - name: Fetch x86_64 functional_groups
       ansible.builtin.include_role:
