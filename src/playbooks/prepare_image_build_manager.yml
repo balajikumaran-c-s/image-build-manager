@@ -45,7 +45,6 @@
 
 - name: Deploy MinIO and Registry on OIM
   hosts: oim
-  connection: ssh
   gather_facts: true
   tasks:
     - name: Deploy MinIO S3 storage

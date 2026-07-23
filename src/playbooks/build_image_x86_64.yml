@@ -199,7 +199,6 @@
 
 - name: OpenCHAMI build image for x86_64
   hosts: oim
-  connection: ssh
   gather_facts: false
   roles:
     - role: build_os_images
