@@ -48,19 +48,36 @@ ansible-playbook image_build_manager.yml                    # Full flow (all tag
 ### Mode B — Container
 
 ```bash
-# Build the domain runner container
+# 1. Configure (same as Mode A)
+cp config.yml.sample config.yml
+# Edit config.yml — set admin_nic_ip, shared_path, etc.
+
+# 2. Provide repo_status.yml
+cp src/samples/repo_status.yml src/repo_status.yml
+# Edit src/repo_status.yml — replace {{ admin_nic_ip }} with actual IP
+
+# 3. Create input project directory with image_build_config.yml
+mkdir -p src/input/project_default/image_build_manager
+cp src/input/image_build_config.yml src/input/project_default/image_build_manager/
+
+# Create src/input/project_default/image_build_manager/image_build_config.yml with S3 config
+
+# 4. Build the domain runner container
+# Note: If you get "couldn't resolve module/action 'ansible.builtin.mount'" errors,
+# rebuild the container to pick up updated requirements.txt
 podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
 
-# Start (long-running — stays alive with sshd)
+# 5. Start (long-running — stays alive with sshd)
+# Note: config.yml input_dir/output_dir are relative to container workdir (/image_build_manager/src/)
 podman run -d --name image_build_mgr --privileged -p 2230:2230 \
-    -v ./config.yml:/image_build_manager/config.yml:ro \
-    -v ./src/repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
-    -v ./input:/image_build_manager/input:rw \
-    -v ./output:/image_build_manager/output:rw \
+    -v $(pwd)/config.yml:/image_build_manager/config.yml:ro \
+    -v $(pwd)/src/repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
+    -v $(pwd)/src/input:/image_build_manager/src/input:rw \
+    -v $(pwd)/src/output:/image_build_manager/src/output:rw \
     -v /run/podman/podman.sock:/run/podman/podman.sock \
     image_build_runner:1.0
 
-# Run tags (container stays alive between runs)
+# 6. Run tags (container stays alive between runs)
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags validate
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags prepare
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags build
