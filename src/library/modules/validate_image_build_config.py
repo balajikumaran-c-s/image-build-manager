@@ -47,12 +47,12 @@ VALIDATION_LOG_PATH = "/opt/omnia/log/core/playbooks/"
 # Files to validate and their corresponding schema names
 VALIDATION_FILES = [
     {
-        "config_file": "image_build_manager/image_build_config.yml",
+        "config_file": "image_build_config.yml",
         "schema_file": "image_build_config.json",
         "required": True,
     },
     {
-        "config_file": "image_build_manager/image_build_credentials.yml",
+        "config_file": "image_build_credentials.yml",
         "schema_file": "image_build_credentials.json",
         "required": False,
     },
