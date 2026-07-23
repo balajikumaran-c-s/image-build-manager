@@ -212,13 +212,37 @@
               are present in {{ _standalone_repo_status_path }}.
             quiet: true
 
-        - name: Set pulp facts for standalone mode (resolve cert path against repo_manager_output)
+        - name: Resolve pulp cert source path from repo_manager_output
           ansible.builtin.set_fact:
-            pulp_port: "{{ repo_manager.port }}"
-            pulp_cert_oim_path: >-
+            _pulp_cert_source: >-
               {{ repo_manager.certificates.server_crt
                  if repo_manager.certificates.server_crt.startswith('/')
                  else _resolved_repo_output + '/' + repo_manager.certificates.server_crt }}
+
+        - name: Validate pulp certificate exists on controller
+          ansible.builtin.stat:
+            path: "{{ _pulp_cert_source }}"
+          register: _pulp_cert_check
+
+        - name: Fail if pulp certificate not found
+          ansible.builtin.fail:
+            msg: >-
+              Pulp certificate not found at {{ _pulp_cert_source }}.
+              Copy the certificate from your repo_manager host into
+              {{ _resolved_repo_output }}/certs/pulp_webserver.crt
+          when: not _pulp_cert_check.stat.exists | default(false)
+
+        - name: Stage pulp certificate to shared_path for cross-mode access
+          ansible.builtin.copy:
+            src: "{{ _pulp_cert_source }}"
+            dest: "{{ oim_shared_path }}/omnia/certs/pulp_webserver.crt"
+            mode: '0644'
+          become: true
+
+        - name: Set pulp facts for standalone mode
+          ansible.builtin.set_fact:
+            pulp_port: "{{ repo_manager.port }}"
+            pulp_cert_oim_path: "{{ oim_shared_path }}/omnia/certs/pulp_webserver.crt"
             cacheable: true
 
     # --- Omnia mode (Mode C) — NOT SUPPORTED. Guarded by standalone_mode. Kept for reference. ---

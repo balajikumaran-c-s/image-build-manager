@@ -44,8 +44,17 @@ s3_configurations:
 #   repo_manager_output/
 #   ├── repo_status.yml
 #   └── certs/
-#       ├── pulp_webserver.crt
+#       ├── pulp_webserver.crt    ← REQUIRED for Pulp TLS
 #       └── pulp_webserver.key
+#
+# Certificate handling:
+#   - Certs are validated at startup and staged to shared_path/omnia/certs/
+#   - This staged copy is used by all build tasks (works in both Mode A & B)
+#   - If the cert is missing, the playbook fails with a clear error message
+#
+# Quick setup:
+#   scp <repo_manager_host>:/opt/omnia/output/repo_manager/certs/* \
+#       src/input/project_default/repo_manager_output/certs/
 repo_manager_output_path: "repo_manager_output"
 
 # ---------------------------------------------------------------------------

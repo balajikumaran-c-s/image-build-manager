@@ -47,7 +47,14 @@ git_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_re
 repo_manager:
   port: 2225
   certificates:
-    # Cert paths are relative to this repo_manager_output/ directory
+    # Cert paths: relative to this repo_manager_output/ directory, or absolute.
+    # During setup, certs are staged to shared_path/omnia/certs/ for cross-mode access.
+    #
+    # To set up certs:
+    #   1. Copy from your repo_manager host:
+    #      scp <repo_manager_host>:/opt/omnia/output/repo_manager/certs/* \
+    #          src/input/project_default/repo_manager_output/certs/
+    #   2. Verify: ls src/input/project_default/repo_manager_output/certs/pulp_webserver.crt
     server_crt: "certs/pulp_webserver.crt"
     server_key: "certs/pulp_webserver.key"
     certs_dir: "certs"
