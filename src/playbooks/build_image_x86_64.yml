@@ -44,7 +44,7 @@
   gather_facts: false
   vars:
     _repo_status_path: >-
-      {{ (playbook_dir + '/../repo_status.yml') if (standalone_mode | default(false) | bool)
+      {{ (_resolved_repo_output | default('') + '/repo_status.yml') if (standalone_mode | default(false) | bool)
          else (repo_manager_output_path | default('') | ternary(repo_manager_output_path, output_project_dir + '/repo_manager/repo_status.yml')) }}
     _should_load_repos: "{{ (standalone_mode | default(false) | bool) or (repo_manager_output_path | default('') | length > 0) }}"
   tasks:
@@ -72,15 +72,19 @@
         - _should_load_repos | bool
         - not repo_status_file.stat.exists | default(false) or overall_status | default('') != 'success'
 
-    - name: Set repo_manager facts (standalone — cert path as-is)
+    - name: Set repo_manager facts (standalone — resolve cert path against repo_manager_output)
       ansible.builtin.set_fact:
         pulp_port: "{{ repo_manager.port | default(2225) }}"
-        pulp_cert_oim_path: "{{ repo_manager.certificates.server_crt | default('') }}"
+        pulp_cert_oim_path: >-
+          {{ (repo_manager.certificates.server_crt | default(''))
+             if (repo_manager.certificates.server_crt | default('')).startswith('/')
+             else (_resolved_repo_output | default('')) + '/' + (repo_manager.certificates.server_crt | default('')) }}
         cacheable: true
       when:
         - standalone_mode | default(false) | bool
         - repo_manager is defined
 
+    # Omnia mode (Mode C) — NOT SUPPORTED. Guarded by standalone_mode. Kept for reference.
     - name: Set repo_manager facts (Omnia — translate cert path)
       ansible.builtin.set_fact:
         pulp_port: "{{ repo_manager.port | default(2225) }}"
@@ -133,7 +137,7 @@
   tasks:
     - name: Load image_build_config.yml
       ansible.builtin.include_vars:
-        file: "{{ input_project_dir }}/image_build_manager/image_build_config.yml"
+        file: "{{ input_project_dir }}/image_build_config.yml"
 
     - name: Set build_stream variables from extra_vars
       ansible.builtin.set_fact:

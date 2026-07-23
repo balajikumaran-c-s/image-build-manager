@@ -175,17 +175,14 @@ CURRENT STATE                              TARGET STATE
 
 # Project settings
 project_name: "my_project"
-input_dir: "/image_build_manager/input"     # Absolute path (container) or /full/path (bare-metal)
-output_dir: "/image_build_manager/output"
+# input/output paths are auto-derived from src/input/<project_name> and src/output/<project_name>
 
 # Build host settings
 build_host:
-  hostname: "localhost"           # "localhost" for local, IP for remote SSH builds
-  ssh_user: "root"
-  ssh_port: 22
-  shared_path: "/opt/image_build" # Local or NFS path for build artifacts
+  hostname: "localhost"            # For cluster naming (standalone always runs locally)
+  shared_path: "/opt/image_build"  # Persistent storage for MinIO + Registry data
   domain_name: "local"
-  admin_nic_ip: "10.20.0.1"       # Admin NIC IP (MinIO endpoint)
+  admin_nic_ip: "10.20.0.1"       # Admin NIC IP — Pulp and S3 endpoint
 
 # OS settings
 cluster_os_type: "rhel"           # rhel | rocky

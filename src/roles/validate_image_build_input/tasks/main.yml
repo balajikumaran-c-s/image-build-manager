@@ -27,7 +27,7 @@
 # Pre-check: ensure image_build_config.yml exists
 - name: Check image_build_config.yml exists
   ansible.builtin.stat:
-    path: "{{ input_project_dir }}/image_build_manager/image_build_config.yml"
+    path: "{{ input_project_dir }}/image_build_config.yml"
   register: image_build_config_stat
 
 - name: Fail if image_build_config.yml is missing

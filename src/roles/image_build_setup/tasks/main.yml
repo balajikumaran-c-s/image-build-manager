@@ -90,7 +90,7 @@
     - upgrade_lock.stat.exists | default(false)
     - not (upgrade_mode | default(false) | bool)
 
-# --- Step 2a: Load omnia project config (Omnia mode) ---
+# --- Step 2a: Load omnia project config (Omnia mode — NOT SUPPORTED, guarded by standalone_mode) ---
 - name: Load omnia project config file
   when: not standalone_mode | bool
   block:
@@ -111,20 +111,36 @@
 
 # --- Step 2b: Load standalone config ---
 - name: Load standalone config
-  when: standalone_mode | bool
+  when:
+    - standalone_mode | bool
+    - _standalone_src_dir is not defined
   block:
     - name: Include standalone config.yml
       ansible.builtin.include_vars:
         file: "{{ playbook_dir }}/../config.yml"
         name: standalone_config
 
-    - name: Set project dirs from standalone config
+    - name: Validate standalone config.yml
+      ansible.builtin.assert:
+        that:
+          - standalone_config.project_name is defined
+          - standalone_config.project_name | length > 0
+          - standalone_config.build_host is defined
+          - standalone_config.build_host.admin_nic_ip is defined
+          - standalone_config.build_host.shared_path is defined
+          - standalone_config.build_host.domain_name is defined
+        fail_msg: >-
+          config.yml is missing required fields.
+          Required: project_name, build_host.admin_nic_ip, build_host.shared_path, build_host.domain_name
+        quiet: true
+
+    - name: Set project dirs from standalone config (derived from playbook_dir)
       ansible.builtin.set_fact:
-        input_project_dir: "{{ standalone_config.input_dir }}/{{ standalone_config.project_name }}"
-        output_project_dir: "{{ standalone_config.output_dir }}/{{ standalone_config.project_name }}"
+        input_project_dir: "{{ playbook_dir }}/input/{{ standalone_config.project_name }}"
+        output_project_dir: "{{ playbook_dir }}/output/{{ standalone_config.project_name }}"
         project_name: "{{ standalone_config.project_name }}"
         admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
-        log_dir: "{{ standalone_config.log_dir | default('/image_build_manager/log') }}"
+        _standalone_src_dir: "{{ playbook_dir }}"
         cacheable: true
 
 - name: Verify the project directory exists
@@ -137,22 +153,31 @@
     msg: "{{ project_dir_not_exist_fail_msg }}"
   when: not verify_project_dir.stat
 
-# --- Step 3a: Load OIM metadata (Omnia mode) ---
+- name: Ensure output project directory exists
+  ansible.builtin.file:
+    path: "{{ output_project_dir }}"
+    state: directory
+    mode: '0755'
+
+# --- Step 3a: Load OIM metadata (Omnia mode — NOT SUPPORTED, guarded by standalone_mode) ---
 - name: Include oim metadata vars
   ansible.builtin.include_vars: "{{ omnia_metadata_file_path }}"
   when: not standalone_mode | bool
 
 # --- Step 3b: Set build host vars (standalone mode) ---
 - name: Set build host vars from standalone config
-  when: standalone_mode | bool
+  when:
+    - standalone_mode | bool
+    - not (image_build_setup_done | default(false) | bool)
   ansible.builtin.set_fact:
     oim_shared_path: "{{ standalone_config.build_host.shared_path }}"
-    oim_node_name: "{{ standalone_config.build_host.hostname }}"
+    oim_node_name: "{{ standalone_config.build_host.hostname | default('localhost') }}"
     domain_name: "{{ standalone_config.build_host.domain_name }}"
     admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
     cacheable: true
 
 # --- Step 4: Create oim inventory group ---
+# Omnia mode (Mode C) — NOT SUPPORTED. Kept for reference.
 - name: Create {{ oim_host_group }} group (Omnia mode) # noqa: name[template]
   ansible.builtin.add_host:
     hostname: "{{ oim_host_group }}"
@@ -164,8 +189,8 @@
 - name: Create {{ oim_host_group }} group (standalone mode) # noqa: name[template]
   ansible.builtin.add_host:
     hostname: "{{ oim_host_group }}"
-    ansible_host: "{{ standalone_config.build_host.hostname | default('localhost') }}"
-    ansible_connection: "{{ 'local' if standalone_config.build_host.hostname | default('localhost') == 'localhost' else 'ssh' }}"
+    ansible_host: "localhost"
+    ansible_connection: "local"
     groups: "{{ oim_host_group }}"
   when: standalone_mode | bool
 

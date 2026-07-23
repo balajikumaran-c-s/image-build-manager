@@ -23,5 +23,5 @@ image_build_validation_fail_msg: >-
   Image build configuration validation failed.
   Review the errors below and fix the configuration files before re-running.
 image_build_config_missing_msg: >-
-  image_build_config.yml not found at {{ input_project_dir }}/image_build_manager/image_build_config.yml.
+  image_build_config.yml not found at {{ input_project_dir }}/image_build_config.yml.
   Please create this file before running image_build_manager.

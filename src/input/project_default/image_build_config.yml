@@ -16,8 +16,8 @@
 #
 # This file is the per-domain input configuration for image_build_manager.
 #
-# Location (NFS):
-#   /opt/omnia/input/project_default/image_build_manager/image_build_config.yml
+# Location:
+#   src/input/project_default/image_build_config.yml
 
 # ---------------------------------------------------------------------------
 # S3 Storage Backend
@@ -34,16 +34,19 @@ s3_configurations:
 # ---------------------------------------------------------------------------
 # Repo Manager Output (upstream dependency)
 # ---------------------------------------------------------------------------
-# image_build_manager reads the repo_manager output file to obtain Pulp RPM repo URLs,
-# certificate paths, and content base URLs. Run repo_manager before image_build_manager.
+# Directory containing repo_status.yml and certs/ from repo_manager.
+# Copy the repo_manager output (repo_status.yml + certs/) into this directory.
 #
-# The repo_status.yml provides:
-#   - rpm_repos.x86_64.baseos, appstream, codeready_builder, epel, ...
-#   - rpm_repos.aarch64.baseos, appstream, codeready_builder, epel, ...
+# Relative paths are resolved against the project directory:
+#   e.g. "repo_manager_output" → src/input/project_default/repo_manager_output/
 #
-# image_build_manager pre-check validates this file exists and overall_status == 'synced'.
-# Leave empty to use default: /opt/omnia/output/<project>/repo_manager/repo_status.yml
-repo_manager_output_path: ""
+# Expected layout inside this directory:
+#   repo_manager_output/
+#   ├── repo_status.yml
+#   └── certs/
+#       ├── pulp_webserver.crt
+#       └── pulp_webserver.key
+repo_manager_output_path: "repo_manager_output"
 
 # ---------------------------------------------------------------------------
 # ARM Build Host (aarch64)

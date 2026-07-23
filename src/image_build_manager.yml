@@ -80,7 +80,7 @@
   tasks:
     - name: Load image_build_config.yml
       ansible.builtin.include_vars:
-        file: "{{ input_project_dir }}/image_build_manager/image_build_config.yml"
+        file: "{{ input_project_dir }}/image_build_config.yml"
 
     - name: Set s3_endpoint from config
       ansible.builtin.set_fact:
@@ -102,10 +102,19 @@
   vars:
     _repo_status_path: "{{ repo_manager_output_path | default('') | ternary(repo_manager_output_path, output_project_dir + '/repo_manager/repo_status.yml') }}"
   tasks:
-    # --- Standalone mode: load repo_status.yml from local path ---
+    # --- Standalone mode: resolve repo_manager_output_path and load repo_status.yml ---
+    - name: Resolve repo_manager_output_path for standalone mode
+      ansible.builtin.set_fact:
+        _resolved_repo_output: >-
+          {{ repo_manager_output_path
+             if (repo_manager_output_path | default('') | length > 0) and (repo_manager_output_path | default('')).startswith('/')
+             else input_project_dir + '/' + (repo_manager_output_path | default('repo_manager_output')) }}
+        cacheable: true
+      when: standalone_mode | default(false) | bool
+
     - name: Set repo_status path for standalone mode
       ansible.builtin.set_fact:
-        _standalone_repo_status_path: "{{ playbook_dir }}/repo_status.yml"
+        _standalone_repo_status_path: "{{ _resolved_repo_output }}/repo_status.yml"
       when: standalone_mode | default(false) | bool
 
     - name: Check if standalone repo_status.yml exists
@@ -113,6 +122,15 @@
         path: "{{ _standalone_repo_status_path }}"
       register: standalone_repo_status_file
       when: standalone_mode | default(false) | bool
+
+    - name: Fail if standalone repo_status.yml not found
+      ansible.builtin.fail:
+        msg: >-
+          repo_status.yml not found at {{ _standalone_repo_status_path }}.
+          Copy repo_status.yml from your repo_manager output into {{ _resolved_repo_output }}/.
+      when:
+        - standalone_mode | default(false) | bool
+        - not standalone_repo_status_file.stat.exists | default(false)
 
     - name: Load standalone repo_status.yml
       ansible.builtin.include_vars:
@@ -195,27 +213,16 @@
               are present in {{ _standalone_repo_status_path }}.
             quiet: true
 
-        - name: Set pulp facts for standalone mode (use cert path as-is)
+        - name: Set pulp facts for standalone mode (resolve cert path against repo_manager_output)
           ansible.builtin.set_fact:
             pulp_port: "{{ repo_manager.port }}"
-            pulp_cert_oim_path: "{{ repo_manager.certificates.server_crt }}"
+            pulp_cert_oim_path: >-
+              {{ repo_manager.certificates.server_crt
+                 if repo_manager.certificates.server_crt.startswith('/')
+                 else _resolved_repo_output + '/' + repo_manager.certificates.server_crt }}
             cacheable: true
 
-        - name: Verify pulp cert file exists on standalone host
-          ansible.builtin.stat:
-            path: "{{ repo_manager.certificates.server_crt }}"
-          register: standalone_pulp_cert
-
-        - name: Fail if pulp cert not found on standalone host
-          ansible.builtin.fail:
-            msg: >
-              Pulp webserver certificate not found at {{ repo_manager.certificates.server_crt }}.
-              In standalone mode the certificate path in repo_status.yml must point
-              to an actual file on this host. Copy the cert from your repo_manager
-              host or update repo_status.yml with the correct path.
-          when: not standalone_pulp_cert.stat.exists | default(false)
-
-    # --- Omnia mode: load repo_status.yml from repo_manager output ---
+    # --- Omnia mode (Mode C) — NOT SUPPORTED. Guarded by standalone_mode. Kept for reference. ---
     - name: Check if repo_status.yml exists
       ansible.builtin.stat:
         path: "{{ _repo_status_path }}"

@@ -44,7 +44,7 @@
   tasks:
     - name: Load image_build_config.yml
       ansible.builtin.include_vars:
-        file: "{{ input_project_dir }}/image_build_manager/image_build_config.yml"
+        file: "{{ input_project_dir }}/image_build_config.yml"
       failed_when: false
 
 # Execute cleanup on OIM host (includes credential removal by default)

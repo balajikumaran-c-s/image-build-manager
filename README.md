@@ -10,7 +10,6 @@ and writes `build_status.yml` with S3 artifact paths.
 |------|-------------|---------------|
 | **A — Bare-metal** | Run directly on a RHEL host with Ansible + Python | `config.yml` + `repo_status.yml` |
 | **B — Container** | Run inside a long-running domain container | Mounted `config.yml` + `repo_status.yml` |
-| **C — Omnia mono-repo** | Run inside `omnia_core` container (existing) | OIM metadata + repo_manager output |
 
 ## Quick Start
 
@@ -23,96 +22,77 @@ ansible-galaxy collection install -r requirements.yml
 
 # 2. Configure
 cp config.yml.sample config.yml
-# Edit config.yml:
-#   - Set input_dir/output_dir to ABSOLUTE paths on this host
-#     e.g., input_dir: "/home/user/image-build-manager/src/input"
-#   - Set admin_nic_ip, shared_path, domain_name
+# Edit config.yml — set admin_nic_ip, shared_path, domain_name
 
-# 3. Provide repo_status.yml (RPM repo URLs + OS version)
-# Copy from repo_manager output or create manually — see src/samples/repo_status.yml
-cp src/samples/repo_status.yml src/repo_status.yml
-# Edit src/repo_status.yml — replace {{ admin_nic_ip }} with actual IP
+# 3. Copy repo_manager output (repo_status.yml + certs)
+# repo_status.yml is already in src/input/project_default/repo_manager_output/
+# Edit it — replace {{ admin_nic_ip }} with actual IP
+# Copy Pulp certs from your repo_manager host:
+cp /path/to/pulp_webserver.crt src/input/project_default/repo_manager_output/certs/
+cp /path/to/pulp_webserver.key src/input/project_default/repo_manager_output/certs/
 
-# 4. Create input project directory with image_build_config.yml
-mkdir -p src/input/project_default/image_build_manager
-# Place image_build_config.yml in the above directory
+# 4. Edit image_build_config.yml (already in place)
+# Edit src/input/project_default/image_build_config.yml
 
-# 5. Set log path (overrides /opt/omnia/ default in ansible.cfg)
+# 5. Run
 export ANSIBLE_LOG_PATH=$(pwd)/log/image_build_manager.log
-export ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
-
-# 6. Run
 cd src
-ansible-playbook image_build_manager.yml --tags validate    # Validate config only
-ansible-playbook image_build_manager.yml --tags prepare     # Deploy MinIO + Registry
-ansible-playbook image_build_manager.yml --tags build       # Build images
-ansible-playbook image_build_manager.yml --tags cleanup     # Cleanup
-ansible-playbook image_build_manager.yml                    # Full flow (all tags)
+ansible-playbook image_build_manager.yml --tags validate
+ansible-playbook image_build_manager.yml --tags prepare
+ansible-playbook image_build_manager.yml --tags build
 ```
 
 ### Mode B — Container
 
+All paths auto-derived — only 4 mounts needed.
+
 ```bash
 # 1. Configure
 cp config.yml.sample config.yml
-# Edit config.yml:
-#   - Default paths (/image_build_manager/input, /output, /log) match the podman mounts below
-#   - Set admin_nic_ip, shared_path, domain_name
+# Edit config.yml — set admin_nic_ip, shared_path, domain_name
 
-# 2. Provide repo_status.yml
-cp src/samples/repo_status.yml src/repo_status.yml
-# Edit src/repo_status.yml — replace {{ admin_nic_ip }} with actual IP
+# 2. Copy repo_manager output (repo_status.yml + certs)
+# repo_status.yml is already in src/input/project_default/repo_manager_output/
+# Edit it — replace {{ admin_nic_ip }} with actual IP
+# Copy Pulp certs from your repo_manager host:
+cp /path/to/pulp_webserver.crt src/input/project_default/repo_manager_output/certs/
+cp /path/to/pulp_webserver.key src/input/project_default/repo_manager_output/certs/
 
-# 3. Create input project directory with image_build_config.yml
-mkdir -p src/input/project_default/image_build_manager
-# Place image_build_config.yml in the above directory
+# 3. Edit image_build_config.yml (already in place)
+# Edit src/input/project_default/image_build_config.yml
 
-# 4. Build the domain runner container
+# 4. Build container
 podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
 
-# 5. Start (long-running — stays alive with sshd)
-# Volume mounts MUST match the absolute paths in config.yml:
-#   config.yml input_dir  → /image_build_manager/input
-#   config.yml output_dir → /image_build_manager/output
+# 5. Start
+mkdir -p /opt/image_build
 podman run -d --name image_build_mgr --privileged -p 2230:2230 \
     -v $(pwd)/config.yml:/image_build_manager/config.yml:ro \
-    -v $(pwd)/src/repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
-    -v $(pwd)/src/input:/image_build_manager/input:rw \
-    -v $(pwd)/src/output:/image_build_manager/output:rw \
-    -v $(pwd)/log:/image_build_manager/log:rw \
+    -v $(pwd)/src:/image_build_manager/src:rw \
+    -v /opt/image_build:/opt/image_build:rw \
     -v /run/podman/podman.sock:/run/podman/podman.sock \
     image_build_runner:1.0
 
-# 6. Run tags (container stays alive between runs)
+# 6. Run
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags validate
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags prepare
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags build
 podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags cleanup
 
-# Debug
+# Debug / Stop
 podman exec -it image_build_mgr bash
-
-# Stop
 podman stop image_build_mgr && podman rm image_build_mgr
-```
-
-### Mode C — Omnia mono-repo (existing behavior)
-
-No changes needed. Run inside `omnia_core` as before:
-
-```bash
-cd omnia/src/image_build_manager
-ansible-playbook image_build_manager.yml
 ```
 
 ## Input Files
 
-| File | Source | Required |
-|------|--------|----------|
-| `config.yml` | User (standalone only) | Modes A/B |
-| `repo_status.yml` | repo_manager output or user-provided | Yes |
-| `image_build_config.yml` | Input project dir | Yes |
-| `image_build_credentials.yml` | Ansible Vault prompt | Yes (except validate/cleanup) |
+| File | Location | Required |
+|------|----------|----------|
+| `config.yml` | Repo root | Yes |
+| `image_build_config.yml` | `src/input/project_default/` | Yes |
+| `repo_status.yml` | `src/input/project_default/repo_manager_output/` | Yes |
+| Pulp certs | `src/input/project_default/repo_manager_output/certs/` | Yes |
+| `image_build_credentials.yml` | Auto-generated in project dir | Yes (except validate/cleanup) |
 
 ## Configuration Reference
 
@@ -123,13 +103,10 @@ Project and build host settings for standalone mode. See `config.yml.sample`.
 | Field | Description | Default |
 |-------|-------------|---------|
 | `project_name` | Project name (maps to input/output dirs) | `project_default` |
-| `input_dir` | Path to input directory | `./input` |
-| `output_dir` | Path to output directory | `./output` |
-| `build_host.hostname` | Build host (`localhost` for local) | `localhost` |
-| `build_host.shared_path` | NFS or local path for build artifacts | `/opt/image_build` |
+| `build_host.hostname` | Hostname for cluster naming (always runs locally) | `localhost` |
+| `build_host.shared_path` | Persistent storage for MinIO + Registry | `/opt/image_build` |
 | `build_host.domain_name` | Domain name for the build host | `local` |
-| `build_host.admin_nic_ip` | Admin NIC IP (used for MinIO/S3 endpoint) | — |
-| `log_dir` | Log directory | `./log` |
+| `build_host.admin_nic_ip` | Admin NIC IP (Pulp and S3 endpoint) | — |
 
 ### `repo_status.yml`
 
@@ -141,7 +118,7 @@ Key fields consumed by image_build_manager:
 - `rpm_repos.x86_64` / `rpm_repos.aarch64` — RPM repository URLs
 - `repo_manager.port` / `repo_manager.certificates` — Pulp connection
 
-See `src/samples/repo_status.yml` for the full structure.
+See `src/input/project_default/repo_manager_output/repo_status.yml` for the full structure.
 
 ## Tags
 
@@ -205,6 +182,13 @@ image-build-manager/
     ├── callback_plugins/        # Output callback
     ├── samples/                 # Sample files (repo_status.yml, build_status.yml)
     ├── vars/                    # Shared variables
+    ├── input/
+    │   └── project_default/
+    │       ├── image_build_config.yml  # Edit this
+    │       └── repo_manager_output/   # Copy repo_manager output here
+    │           ├── repo_status.yml
+    │           └── certs/             # Pulp certs
+    ├── output/                  # Build output (auto-created)
     └── containers/
         ├── build_images.sh      # Build script for image containers
         ├── image_builder/       # OpenCHAMI image builder container (ochami)

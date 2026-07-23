@@ -59,14 +59,14 @@ image_build_work_dir: "{{ oim_shared_path }}/omnia/image_build_manager"
 # ---------------------------------------------------------------------------
 output_project_dir: "{{ hostvars['localhost']['output_project_dir'] | default('/opt/omnia/output/project_default') }}"
 build_status_latest: "{{ output_project_dir }}/build_status.yml"
-build_status_versioned_dir: "{{ output_project_dir }}/image_build_manager"
+build_status_versioned_dir: "{{ output_project_dir }}"
 
 # ---------------------------------------------------------------------------
 # Credential cleanup
 # ---------------------------------------------------------------------------
 input_project_dir: "{{ hostvars['localhost']['input_project_dir'] | default('/opt/omnia/input/project_default') }}"
-image_build_credentials_file: "{{ input_project_dir }}/image_build_manager/image_build_credentials.yml"
-image_build_credentials_key: "{{ input_project_dir }}/image_build_manager/.image_build_credentials_key"
+image_build_credentials_file: "{{ input_project_dir }}/image_build_credentials.yml"
+image_build_credentials_key: "{{ input_project_dir }}/.image_build_credentials_key"
 
 # ---------------------------------------------------------------------------
 # omnia.target service entries to remove

@@ -28,7 +28,7 @@ validate_s3_provider_fail_msg: >
   Invalid or missing s3_configurations.provider in image_build_config.yml.
   Allowed values: 'minio' or 'powerscale'.
   Please set s3_configurations.provider in
-  {{ input_project_dir }}/image_build_manager/image_build_config.yml
+  {{ input_project_dir }}/image_build_config.yml
 
 validate_s3_bucket_fail_msg: >
   S3 bucket name is invalid. NOTE: bucket names are FIXED constants
