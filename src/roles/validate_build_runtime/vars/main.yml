@@ -15,8 +15,8 @@
 # Variables and error messages for image_build_manager input validation
 
 # File paths used by validation tasks
-input_project_dir: "{{ hostvars['localhost']['input_project_dir'] | default('/opt/omnia/input/project_default') }}"
-functional_groups_file_path: "{{ hostvars['localhost']['functional_groups_config_path'] | default('/opt/omnia/.data/functional_groups_config.yml') }}"
+input_project_dir: "{{ hostvars['localhost']['input_project_dir'] }}"
+functional_groups_file_path: "{{ hostvars['localhost']['functional_groups_config_path'] }}"
 
 # Fixed S3 bucket names — NOT user-modifiable
 s3_boot_images_bucket: "boot-images"

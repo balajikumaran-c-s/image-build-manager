@@ -37,6 +37,23 @@
             "type": "string",
             "description": "Path to repo_manager output file (repo_status.yml). Default: {{ output_project_dir }}/repo_manager/repo_status.yml"
         },
+        "functional_groups": {
+            "type": "array",
+            "description": "Functional groups defining image variants to build. Each group must end with _x86_64 or _aarch64.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Functional group name (e.g., os_x86_64, slurm_node_x86_64).",
+                        "pattern": "^(os|slurm_node|slurm_control_node|login_node|login_compiler_node|service_kube_control_plane_first|service_kube_control_plane|service_kube_node)_(x86_64|aarch64)$"
+                    }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+            },
+            "minItems": 1
+        },
         "build_image": {
             "type": "object",
             "description": "Build image async job settings.",

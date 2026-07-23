@@ -42,7 +42,7 @@ from ansible.module_utils.image_build_validation.image_build_validation_flow imp
 )
 
 
-VALIDATION_LOG_PATH = "/opt/omnia/log/core/playbooks/"
+VALIDATION_LOG_PATH = "/opt/omnia/log/core/playbooks/"  # Mode C default — overridden by log_dir param
 
 # Files to validate and their corresponding schema names
 VALIDATION_FILES = [
@@ -160,14 +160,20 @@ def run_module():
     module_args = dict(
         input_project_dir=dict(type="str", required=True),
         schema_dir=dict(type="str", required=True),
+        log_dir=dict(type="str", required=False, default=""),
     )
 
     module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
 
     input_project_dir = module.params["input_project_dir"]
     schema_dir = module.params["schema_dir"]
+    log_dir = module.params.get("log_dir", "")
     project_name = os.path.basename(input_project_dir)
 
+    # Use provided log_dir or fall back to default
+    if log_dir:
+        global VALIDATION_LOG_PATH
+        VALIDATION_LOG_PATH = log_dir
     logger, log_file = create_logger(project_name)
     logger.info("=== Image Build Manager Validation Start ===")
 

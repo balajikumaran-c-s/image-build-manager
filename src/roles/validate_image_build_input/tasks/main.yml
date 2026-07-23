@@ -40,6 +40,7 @@
   validate_image_build_config:
     input_project_dir: "{{ input_project_dir }}"
     schema_dir: "{{ image_build_schema_dir }}"
+    log_dir: "{{ output_project_dir | default(playbook_dir + '/output') }}/log"
   register: image_build_validation_result
 
 # Report results

@@ -15,7 +15,7 @@
 # cleanup_image_build_manager/vars/main.yml — Variables for image_build_manager cleanup.
 
 # OIM metadata (loaded on localhost via include_input_dir with omnia_metadata_support)
-oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] | default('/opt/omnia') }}"
+oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] }}"
 omnia_nfs_share: "{{ oim_shared_path }}/omnia"
 
 # S3 configuration from image_build_config.yml (loaded on localhost)
@@ -57,14 +57,14 @@ image_build_work_dir: "{{ oim_shared_path }}/omnia/image_build_manager"
 # ---------------------------------------------------------------------------
 # Output files cleanup
 # ---------------------------------------------------------------------------
-output_project_dir: "{{ hostvars['localhost']['output_project_dir'] | default('/opt/omnia/output/project_default') }}"
+output_project_dir: "{{ hostvars['localhost']['output_project_dir'] }}"
 build_status_latest: "{{ output_project_dir }}/build_status.yml"
 build_status_versioned_dir: "{{ output_project_dir }}"
 
 # ---------------------------------------------------------------------------
 # Credential cleanup
 # ---------------------------------------------------------------------------
-input_project_dir: "{{ hostvars['localhost']['input_project_dir'] | default('/opt/omnia/input/project_default') }}"
+input_project_dir: "{{ hostvars['localhost']['input_project_dir'] }}"
 image_build_credentials_file: "{{ input_project_dir }}/image_build_credentials.yml"
 image_build_credentials_key: "{{ input_project_dir }}/.image_build_credentials_key"
 

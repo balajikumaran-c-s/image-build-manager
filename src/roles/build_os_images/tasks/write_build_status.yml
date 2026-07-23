@@ -28,8 +28,8 @@
 
 - name: Set output paths
   ansible.builtin.set_fact:
-    _output_base: "{{ output_project_dir | default('/opt/omnia/output/project_default') }}"
-    _output_domain: "{{ output_project_dir | default('/opt/omnia/output/project_default') }}"
+    _output_base: "{{ output_project_dir }}"
+    _output_domain: "{{ output_project_dir }}"
     _omnia_version: "{{ omnia_version | default('2.2.0.0') }}"
 
 - name: Ensure output directories exist

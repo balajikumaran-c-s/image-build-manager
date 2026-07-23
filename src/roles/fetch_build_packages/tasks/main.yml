@@ -12,45 +12,96 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 ---
-- name: Check local_repo.yml execution
+# ==========================================================================
+# Standalone mode: Load packages from functional_group_packages.yml
+# ==========================================================================
+# Replaces the Mode C chain of:
+#   metadata_file_path → software_config.json → config/<arch>/*.json
+#   → base_image_package_collector → image_package_collector
+# with a single flat mapping file.
+
+- name: Load functional group package mapping (standalone)
+  when: standalone_mode | default(false) | bool
   block:
-    - name: Check if metadata file exists
-      ansible.builtin.stat:
-        path: "{{ metadata_file_path }}"
-      register: metadata_file_status
+    - name: Load functional_group_packages.yml
+      ansible.builtin.include_vars:
+        file: "{{ _resolved_repo_output }}/functional_group_packages.yml"
+        name: _fg_pkg_mapping
 
-    - name: Fail if metadata file is not present
-      ansible.builtin.fail:
-        msg: "{{ local_repo_check_msg }}"
-      when: not metadata_file_status.stat.exists
+    - name: Set base_image_packages from mapping
+      ansible.builtin.set_fact:
+        base_image_packages: "{{ _fg_pkg_mapping.base_packages | default([]) }}"
+        cacheable: true
 
-- name: Initialize fg_present as false
-  ansible.builtin.set_fact:
-    fg_present: "{{ fg_present | default(false) }}"
-  when: enable_build_stream | default(false)
+    - name: Build compute_images_dict from mapping + enabled functional_groups
+      ansible.builtin.set_fact:
+        compute_images_dict: >-
+          {% set result = {} -%}
+          {% for fg in functional_groups -%}
+            {% set fg_name = fg.name if fg is mapping else fg -%}
+            {% if fg_name.endswith('_' + build_arch) -%}
+              {% set pkgs = (_fg_pkg_mapping.functional_groups[fg_name].packages | default([])) -%}
+              {% set _ = result.update({fg_name: {'functional_group': fg_name, 'packages': pkgs}}) -%}
+            {% endif -%}
+          {% endfor -%}
+          {{ result }}
+        cacheable: true
 
-- name: Include functional groups config
-  ansible.builtin.include_vars:
-    file: "{{ functional_groups_file_path }}"
-    name: functional_groups_config
-  when: not (enable_build_stream | default(false) | bool)
+    - name: Set cluster OS version from repo_status
+      ansible.builtin.set_fact:
+        rhel_tag: "{{ cluster_os_version }}"
 
-- name: Set functional_groups_file_path for build_stream disabled flow
-  ansible.builtin.set_fact:
-    functional_groups_file_path: "{{ functional_groups_file_path }}"
-  when: not (enable_build_stream | default(false) | bool)
-
-- name: Set cluster OS facts
-  ansible.builtin.set_fact:
-    rhel_tag: "{{ cluster_os_version }}"
-    default_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/{{ cluster_os_type }}/{{ cluster_os_version }}/default_packages.json"   # noqa: yaml[line-length]
-    additional_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/{{ cluster_os_type }}/{{ cluster_os_version }}/additional_packages.json"   # noqa: yaml[line-length]
-    admin_debug_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/{{ cluster_os_type }}/{{ cluster_os_version }}/admin_debug_packages.json"  # noqa: yaml[line-length]
+    - name: Debug standalone package resolution
+      ansible.builtin.debug:
+        msg: "Standalone: {{ compute_images_dict | length }} functional groups, {{ base_image_packages | length }} base packages"
+        verbosity: 1
 
 - name: Fetch pulp endpoint repos
   ansible.builtin.include_tasks: fetch_pulp_repos.yml
-  when: fg_present or (enable_build_stream | default(false) | bool)
+  when: standalone_mode | default(false) | bool
 
-- name: Fetch packages for base and compute image softwares
-  ansible.builtin.include_tasks: fetch_packages.yml
-  when: fg_present or (enable_build_stream | default(false) | bool)
+# ==========================================================================
+# Mode C (Omnia) — NOT SUPPORTED. Commented out for reference.
+# ==========================================================================
+# - name: Check local_repo.yml execution
+#   block:
+#     - name: Check if metadata file exists
+#       ansible.builtin.stat:
+#         path: "{{ metadata_file_path }}"
+#       register: metadata_file_status
+#
+#     - name: Fail if metadata file is not present
+#       ansible.builtin.fail:
+#         msg: "{{ local_repo_check_msg }}"
+#       when: not metadata_file_status.stat.exists
+#
+# - name: Initialize fg_present as false
+#   ansible.builtin.set_fact:
+#     fg_present: "{{ fg_present | default(false) }}"
+#   when: enable_build_stream | default(false)
+#
+# - name: Include functional groups config
+#   ansible.builtin.include_vars:
+#     file: "{{ functional_groups_file_path }}"
+#     name: functional_groups_config
+#   when: not (enable_build_stream | default(false) | bool)
+#
+# - name: Set functional_groups_file_path for build_stream disabled flow
+#   ansible.builtin.set_fact:
+#     functional_groups_file_path: "{{ functional_groups_file_path }}"
+#   when: not (enable_build_stream | default(false) | bool)
+#
+# - name: Set cluster OS facts
+#   ansible.builtin.set_fact:
+#     rhel_tag: "{{ cluster_os_version }}"
+#     default_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/..."
+#     additional_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/..."
+#     admin_debug_json_path: "{{ input_project_dir }}/config/{{ build_arch }}/..."
+#
+# - name: Fetch pulp endpoint repos
+#   ansible.builtin.include_tasks: fetch_pulp_repos.yml
+#   when: fg_present or (enable_build_stream | default(false) | bool)
+#
+# - name: Fetch packages for base and compute image softwares
+#   ansible.builtin.include_tasks: fetch_packages.yml
+#   when: fg_present or (enable_build_stream | default(false) | bool)

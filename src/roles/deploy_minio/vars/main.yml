@@ -13,7 +13,7 @@
 # limitations under the License.
 ---
 # OIM metadata (loaded on localhost via include_input_dir with omnia_metadata_support)
-oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] | default('/opt/omnia') }}"
+oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] }}"
 oim_node_name: "{{ hostvars['localhost']['oim_node_name'] | default(ansible_hostname) }}"
 domain_name: "{{ hostvars['localhost']['domain_name'] | default(ansible_domain) }}"
 admin_nic_ip: "{{ hostvars['localhost']['admin_nic_ip'] | default(ansible_default_ipv4.address) }}"
