@@ -30,6 +30,14 @@
 
 overall_status: "success"
 
+# OS metadata — tells consumers what OS the repos were synced for
+# IMPORTANT: Keys must NOT have quotes in the key name.
+#   Correct:  cluster_os_type: "rhel"
+#   Wrong:    cluster_os_type": "rhel"   ← extra quote breaks YAML
+cluster_os_type: "rhel"
+cluster_os_version: "10.0"
+repo_config: "partial"
+
 # Base URLs for other content types
 tarball_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/tarballs/"
 manifest_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/manifests/"

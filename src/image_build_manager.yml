@@ -146,7 +146,6 @@
         cacheable: true
       when:
         - standalone_mode | default(false) | bool
-        - cluster_os_type is defined
 
     - name: Build repo lists from standalone repo_status.yml
       when:

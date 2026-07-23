@@ -49,7 +49,12 @@
 
     - name: Set cluster OS version from repo_status
       ansible.builtin.set_fact:
-        rhel_tag: "{{ cluster_os_version }}"
+        rhel_tag: "{{ hostvars['localhost']['cluster_os_version'] | default(cluster_os_version | default('10.0')) }}"
+
+    - name: Set service_k8s_version (empty unless overridden)
+      ansible.builtin.set_fact:
+        service_k8s_version: ""
+        cacheable: true
 
     - name: Debug standalone package resolution
       ansible.builtin.debug:

@@ -14,15 +14,15 @@ inside the Omnia mono-repo ecosystem. The core container is **not required**.
 
 | # | Dependency | Files Affected | Type | Status |
 |---|-----------|---------------|------|--------|
-| 1 | **OIM metadata** (`/opt/omnia/.data/oim_metadata.yml`) | `image_build_setup/vars/main.yml`, 15 role vars files | Config | ❌ Coupled |
-| 2 | **Project config** (`/opt/omnia/input/default.yml`) | `image_build_setup` role | Config | ❌ Coupled |
-| 3 | **Upgrade lock** (`/opt/omnia/.data/upgrade_in_progress.lock`) | `image_build_setup` role | Guard | ❌ Coupled |
-| 4 | **repo_status.yml** (from `repo_manager`) | `image_build_manager.yml` Step 4 | Contract | ❌ Coupled |
-| 5 | **software_config.json** | `fetch_build_packages`, `validate_build_runtime`, `image_package_collector.py` | Config | ❌ Coupled |
-| 6 | **Core container** (`omnia_core`) | Runtime assumption | Runtime | ❌ Coupled |
-| 7 | **OIM host group** (SSH to OIM) | All `hosts: oim` plays | Inventory | ❌ Coupled |
-| 8 | **omnia.target** (systemd) | `prepare_image_build_manager.yml`, `cleanup` | Service | ❌ Coupled |
-| 9 | **`/opt/omnia/` hardcoded paths** | `ansible.cfg` (log, tmp), 19 files (62 occurrences) | Paths | ❌ Coupled |
+| 1 | **OIM metadata** (`/opt/omnia/.data/oim_metadata.yml`) | `image_build_setup/vars/main.yml` | Config | ✅ Replaced by `config.yml` |
+| 2 | **Project config** (`/opt/omnia/input/default.yml`) | `image_build_setup` role | Config | ✅ Replaced by `config.yml` |
+| 3 | **Upgrade lock** (`/opt/omnia/.data/upgrade_in_progress.lock`) | `image_build_setup` role | Guard | ✅ Commented out |
+| 4 | **repo_status.yml** (from `repo_manager`) | `image_build_manager.yml` Step 4 | Contract | ✅ User-provided in `repo_manager_output/` |
+| 5 | **software_config.json** | `fetch_build_packages`, `image_package_collector.py` | Config | ✅ Replaced by `functional_group_packages.yml` |
+| 6 | **Core container** (`omnia_core`) | Runtime assumption | Runtime | ✅ Not required — Mode A/B only |
+| 7 | **OIM host group** (SSH to OIM) | All `hosts: oim` plays | Inventory | ✅ Auto-detected (local/SSH) |
+| 8 | **omnia.target** (systemd) | `prepare_image_build_manager.yml`, `cleanup` | Service | ✅ Skipped in standalone |
+| 9 | **`/opt/omnia/` hardcoded paths** | All role vars files | Paths | ✅ All defaults removed — use `config.yml` paths |
 | 10 | **Credential utility** | Replaced by `collect_build_credentials` role | Eliminated | ✅ Done |
 | 11 | **common/callback_plugins/** | Local copy at `callback_plugins/omnia_default.py` | Eliminated | ✅ Done |
 | 12 | **common/library/modules/** | All 5 modules local at `library/modules/` | Eliminated | ✅ Done |
@@ -45,41 +45,46 @@ inside the Omnia mono-repo ecosystem. The core container is **not required**.
 ✅ zero ../common/       — no ansible.cfg references to ../common/ or ../playbooks/utils/
 ```
 
-### 1.3 Remaining Omnia Coupling (9 items to decouple)
+### 1.3 Omnia Coupling — FULLY RESOLVED
 
-| # | Coupling | Occurrences | Decoupling Strategy |
-|---|---------|-------------|---------------------|
-| 1 | `/opt/omnia/.data/oim_metadata.yml` | 1 file | Replace with `config.yml → build_host` section |
-| 2 | `/opt/omnia/input/default.yml` | 1 file | Replace with `config.yml → project settings` |
-| 3 | `/opt/omnia/.data/upgrade_in_progress.lock` | 1 file | Skip in standalone mode |
-| 4 | `repo_status.yml` from repo_manager | 1 play | Keep as separate file; user provides it in standalone mode |
-| 5 | `software_config.json` (OS fields) | 3 roles | Move `cluster_os_type`/`cluster_os_version` into `repo_status.yml` |
-| 6 | Core container assumption | Runtime | Support bare-metal + optional per-domain container (long-running) |
-| 7 | `omnia.target` systemd registration | 2 files | Skip in standalone mode |
-| 8 | `/opt/omnia/` in `ansible.cfg` | 2 lines (log, tmp) | Use `./log/` and `/tmp/.ansible/` |
-| 9 | `/opt/omnia/` default paths in role vars | 17 files | Use `{{ base_path }}` variable (configurable) |
+All 9 Omnia coupling points have been resolved:
+
+| # | Coupling | Resolution |
+|---|---------|------------|
+| 1 | OIM metadata | Replaced by `config.yml → build_host` section |
+| 2 | Project config | Replaced by `config.yml → project_name` |
+| 3 | Upgrade lock | Commented out in `image_build_setup/vars/main.yml` |
+| 4 | `repo_status.yml` | User-provided in `repo_manager_output/` |
+| 5 | `software_config.json` | **Replaced by `functional_group_packages.yml`** — direct RPM mapping, no software_config.json needed |
+| 6 | Core container | Mode A (bare-metal) + Mode B (domain container) — no `omnia_core` needed |
+| 7 | `omnia.target` | Skipped in standalone mode |
+| 8 | `/opt/omnia/` in `ansible.cfg` | Uses `./log/` and `/tmp/.ansible/` |
+| 9 | `/opt/omnia/` defaults in vars | All `/opt/omnia` fallback defaults removed from role vars |
 
 ---
 
-## 2. Input Files — `repo_status.yml` and `software_config.json`
+## 2. Input Files — Package Resolution (Standalone)
 
-### 2.1 Current State: Two Separate Files
+### 2.1 Design Decision: Replace `software_config.json` With Direct Mapping
+
+**Problem** (Mode C): `software_config.json` is a project-level file shared across ALL domains.
+It defines which software modules are enabled, then per-arch JSON files in `config/<arch>/<os>/<ver>/`
+contain the actual RPM packages. `image_package_collector.py` and `base_image_package_collector.py`
+read both to resolve the final package list. This chain has 4 files and 2 Python modules.
+
+**Solution** (Standalone): A single `functional_group_packages.yml` file in `repo_manager_output/`
+maps functional groups directly to RPM packages. No `software_config.json`, no per-arch JSON files,
+no collector modules needed.
 
 ```
-software_config.json (project-level)     repo_status.yml (from repo_manager)
-├── cluster_os_type: "rhel"              ├── overall_status: "success"
-├── cluster_os_version: "10.0"           ├── rpm_repos:
-├── softwares:                           │   ├── x86_64: { baseos: "...", appstream: "..." }
-│   ├── { name: "service_k8s", ... }     │   └── aarch64: { baseos: "...", appstream: "..." }
-│   └── ...                              ├── repo_manager:
-└── ...                                  │   ├── port: 2225
-                                         │   └── certificates: { server_crt: "..." }
-                                         └── user_repos: { ... }
+MODE C (NOT SUPPORTED):                 STANDALONE (Mode A/B):
+software_config.json                    functional_group_packages.yml
+  → config/<arch>/<os>/<ver>/*.json       ├── base_packages: [systemd, kernel, ...]
+  → image_package_collector.py            └── functional_groups:
+  → base_image_package_collector.py             slurm_node_x86_64:
+  → compute_images_dict                           packages: [munge, slurm-slurmd, ...]
+                                                → compute_images_dict (directly)
 ```
-
-**Problem**: `software_config.json` is a project-level file shared across ALL domains.
-`image_build_manager` only uses `cluster_os_type` and `cluster_os_version` from it.
-The `softwares` array (service_k8s, additional_packages, etc.) is also used for the package catalog.
 
 ### 2.2 Design Decision: Keep `repo_status.yml` Separate, Extend With OS Metadata
 
@@ -196,21 +201,18 @@ The `cluster_os_type` and `cluster_os_version` facts are set by `image_build_set
 (from `repo_status.yml` in all modes). The `| default(software_config.*)` fallback
 preserves backward compatibility when repo_status.yml doesn't have OS fields yet.
 
-### 2.5 `software_config.json` in Standalone Mode
+### 2.5 `software_config.json` — NOT USED in Standalone Mode
 
-In standalone mode, `software_config.json` is **still needed** for the package catalog:
-- `softwares[]` array — which software packages to include in images
-- `service_k8s` version — Kubernetes version for service images
-- `additional_packages` — extra RPMs per functional group
-- `admin_debug_packages` — debug/diagnostic RPMs
-
-OS type/version are now read from `repo_status.yml` instead.
+In standalone mode, `software_config.json` is **completely replaced** by
+`functional_group_packages.yml`. The entire Mode C package resolution chain
+(`software_config.json` → per-arch JSONs → `image_package_collector.py` →
+`base_image_package_collector.py`) is commented out in `fetch_build_packages/tasks/main.yml`.
 
 **Standalone user provides these input files**:
 1. `config.yml` — project settings + build host (replaces OIM metadata + default.yml)
-2. `repo_status.yml` — RPM repo URLs + OS type/version (separate file)
-3. `software_config.json` — softwares catalog (which packages to include in images)
-4. `image_build_config.yml` — S3 provider, aarch64 host, build settings
+2. `repo_status.yml` — RPM repo URLs + OS type/version (in `repo_manager_output/`)
+3. `functional_group_packages.yml` — functional group → RPM package mapping (in `repo_manager_output/`)
+4. `image_build_config.yml` — S3 provider, functional groups list, aarch64 host, build settings
 
 ---
 
@@ -261,9 +263,10 @@ OS type/version are now read from `repo_status.yml` instead.
 | **Ansible source** | User-installed (`pip install ansible-core`) | Pinned in container image | Bundled in `omnia_core` |
 | **Python source** | User-installed (system or venv) | Pinned in container image | Bundled in `omnia_core` |
 | **Container runtime** | Required on host (Podman/Docker) | Required on host | Required on host |
-| **Config source** | `config.yml` + `repo_status.yml` | Same (volume-mounted) | OIM metadata + default.yml |
+| **Config source** | `config.yml` + `repo_status.yml` + `functional_group_packages.yml` | Same (volume-mounted) | OIM metadata + default.yml |
 | **RPM repos** | `repo_status.yml` (user-provided) | Same (volume-mounted) | `repo_status.yml` from repo_manager |
-| **OS type/version** | `repo_status.yml` | `repo_status.yml` | `repo_status.yml` / `software_config.json` |
+| **OS type/version** | `repo_status.yml` | `repo_status.yml` | `software_config.json` (Mode C) |
+| **Package mapping** | `functional_group_packages.yml` | `functional_group_packages.yml` | `software_config.json` + per-arch JSONs (Mode C) |
 | **Core container needed** | **No** | **No** | **Yes** |
 | **OIM metadata needed** | **No** | **No** | **Yes** |
 | **Air-gap support** | Via local RPM mirror URLs in `repo_status.yml` | Same | Via Pulp (repo_manager) |

@@ -123,44 +123,65 @@ user_repos:
 
 ---
 
-## 4. software_config.json (shared input)
+## 4. functional_group_packages.yml
 
-**Purpose**: Cluster OS type, version, and software stack definition.
+**Purpose**: Single source of truth mapping functional groups to RPM packages.
 
-**Location**: `input/project_default/software_config.json`
+**Location**: `input/project_default/repo_manager_output/functional_group_packages.yml`
 
-**Owner**: User (shared across domains)
+**Owner**: User / repo_manager output
 
-**Consumed Fields**:
+**Replaces**: The Mode C chain of `software_config.json` → `config/<arch>/*.json` → `image_package_collector.py`
 
-| Field | Usage in image_build_manager |
-|-------|------------------------------|
-| `cluster_os_type` | Selects base image type (e.g., `rhel`) |
-| `cluster_os_version` | Sets OS version for image naming (e.g., `10.0`) |
-| `softwares[].name` | Determines functional groups and packages |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `base_packages` | list[string] | Yes | RPM packages installed in every image (base OS layer) |
+| `functional_groups` | dict | Yes | Keyed by functional group name |
+| `functional_groups.<name>.packages` | list[string] | Yes | Additional RPMs for that functional group (on top of base) |
+
+**Example**:
+
+```yaml
+base_packages:
+  - systemd
+  - kernel
+  - dracut
+
+functional_groups:
+  os_x86_64:
+    packages: []
+  slurm_node_x86_64:
+    packages:
+      - munge
+      - slurm-slurmd
+      - slurm-pam_slurm
+```
+
+**Validation**: Functional group names in this file must match entries in
+`image_build_config.yml → functional_groups[].name`.
+
+> **Note**: `software_config.json` is **NOT used** in standalone mode. OS type and version
+> come from `repo_status.yml`. Package lists come from this file.
 
 ---
 
 ## 5. Dependency Summary
 
 ```
-                    ┌─────────────────────────┐
-                    │   credential_utility     │
-                    │  (tag: image_build_mgr)  │
-                    └────────┬────────────────┘
-                             │ produces
-                             ▼
-                    ┌─────────────────────────┐
-                    │ image_build_credentials  │
-                    │        .yml              │
-                    └────────┬────────────────┘
-                             │
-  ┌──────────────┐           │           ┌──────────────────┐
-  │ image_build  │           │           │  repo_status.yml │
-  │  _config.yml │───────────┼──────────▶│  (from repo_mgr) │
-  └──────────────┘           │           └──────────────────┘
-                             │
-                    ┌────────▼────────────────┐
-                    │  image_build_manager.yml │
-                    └─────────────────────────┘
+  ┌──────────────────┐    ┌──────────────────────────────┐
+  │ image_build      │    │ repo_manager_output/         │
+  │  _config.yml     │    │   ├── repo_status.yml        │
+  │  (functional     │    │   ├── functional_group       │
+  │   groups list)   │    │   │   _packages.yml          │
+  └────────┬─────────┘    │   └── certs/                 │
+           │              └──────────────┬───────────────┘
+           │                             │
+           └──────────┬──────────────────┘
+                      │
+             ┌────────▼────────────────┐
+             │  image_build_manager.yml │
+             │                         │
+             │  base_image_packages ◄── base_packages
+             │  compute_images_dict ◄── functional_groups + packages
+             └─────────────────────────┘
 ```
