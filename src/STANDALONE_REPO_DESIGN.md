@@ -590,8 +590,8 @@ It does NOT contain RPM repos or OS version — those stay in `repo_status.yml`.
 ---
 # Project settings (replaces: /opt/omnia/input/default.yml)
 project_name: "my_project"
-input_dir: "./input"
-output_dir: "./output"
+input_dir: "/image_build_manager/input"     # Absolute path (container) or /full/path (bare-metal)
+output_dir: "/image_build_manager/output"
 
 # Build host settings (replaces: /opt/omnia/.data/oim_metadata.yml)
 build_host:

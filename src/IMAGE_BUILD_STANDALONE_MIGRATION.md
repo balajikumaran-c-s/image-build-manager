@@ -175,8 +175,8 @@ CURRENT STATE                              TARGET STATE
 
 # Project settings
 project_name: "my_project"
-input_dir: "./input"
-output_dir: "./output"
+input_dir: "/image_build_manager/input"     # Absolute path (container) or /full/path (bare-metal)
+output_dir: "/image_build_manager/output"
 
 # Build host settings
 build_host:

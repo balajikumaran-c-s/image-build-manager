@@ -4,11 +4,23 @@
 #
 # This file replaces OIM metadata + default.yml in standalone mode.
 # RPM repos and OS version are in repo_status.yml (separate file).
+#
+# IMPORTANT: input_dir, output_dir, log_dir MUST be absolute paths.
+#
+# Container mode (podman):
+#   input_dir:  "/image_build_manager/input"   — matches podman -v mount target
+#   output_dir: "/image_build_manager/output"
+#   log_dir:    "/image_build_manager/log"
+#
+# Bare-metal mode:
+#   input_dir:  "/full/path/to/image-build-manager/src/input"
+#   output_dir: "/full/path/to/image-build-manager/src/output"
+#   log_dir:    "/full/path/to/image-build-manager/log"
 
 # Project settings
 project_name: "project_default"
-input_dir: "./input"
-output_dir: "./output"
+input_dir: "/image_build_manager/input"
+output_dir: "/image_build_manager/output"
 
 # Build host settings
 build_host:
@@ -18,4 +30,4 @@ build_host:
   admin_nic_ip: "10.20.0.1"       # Admin NIC IP (MinIO/S3 endpoint)
 
 # Logging
-log_dir: "./log"
+log_dir: "/image_build_manager/log"

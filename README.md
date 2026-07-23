@@ -23,17 +23,22 @@ ansible-galaxy collection install -r requirements.yml
 
 # 2. Configure
 cp config.yml.sample config.yml
-# Edit config.yml — set admin_nic_ip, shared_path, etc.
+# Edit config.yml:
+#   - Set input_dir/output_dir to ABSOLUTE paths on this host
+#     e.g., input_dir: "/home/user/image-build-manager/src/input"
+#   - Set admin_nic_ip, shared_path, domain_name
 
 # 3. Provide repo_status.yml (RPM repo URLs + OS version)
 # Copy from repo_manager output or create manually — see src/samples/repo_status.yml
 cp src/samples/repo_status.yml src/repo_status.yml
+# Edit src/repo_status.yml — replace {{ admin_nic_ip }} with actual IP
 
 # 4. Create input project directory with image_build_config.yml
-mkdir -p input/project_default/image_build_manager
+mkdir -p src/input/project_default/image_build_manager
+# Place image_build_config.yml in the above directory
 
 # 5. Set log path (overrides /opt/omnia/ default in ansible.cfg)
-export ANSIBLE_LOG_PATH=./log/image_build_manager.log
+export ANSIBLE_LOG_PATH=$(pwd)/log/image_build_manager.log
 export ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
 
 # 6. Run
@@ -48,9 +53,11 @@ ansible-playbook image_build_manager.yml                    # Full flow (all tag
 ### Mode B — Container
 
 ```bash
-# 1. Configure (same as Mode A)
+# 1. Configure
 cp config.yml.sample config.yml
-# Edit config.yml — set admin_nic_ip, shared_path, etc.
+# Edit config.yml:
+#   - Default paths (/image_build_manager/input, /output, /log) match the podman mounts below
+#   - Set admin_nic_ip, shared_path, domain_name
 
 # 2. Provide repo_status.yml
 cp src/samples/repo_status.yml src/repo_status.yml
@@ -58,22 +65,21 @@ cp src/samples/repo_status.yml src/repo_status.yml
 
 # 3. Create input project directory with image_build_config.yml
 mkdir -p src/input/project_default/image_build_manager
-cp src/input/image_build_config.yml src/input/project_default/image_build_manager/
-
-# Create src/input/project_default/image_build_manager/image_build_config.yml with S3 config
+# Place image_build_config.yml in the above directory
 
 # 4. Build the domain runner container
-# Note: If you get "couldn't resolve module/action 'ansible.builtin.mount'" errors,
-# rebuild the container to pick up updated requirements.txt
 podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
 
 # 5. Start (long-running — stays alive with sshd)
-# Note: config.yml input_dir/output_dir are relative to container workdir (/image_build_manager/src/)
+# Volume mounts MUST match the absolute paths in config.yml:
+#   config.yml input_dir  → /image_build_manager/input
+#   config.yml output_dir → /image_build_manager/output
 podman run -d --name image_build_mgr --privileged -p 2230:2230 \
     -v $(pwd)/config.yml:/image_build_manager/config.yml:ro \
     -v $(pwd)/src/repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
-    -v $(pwd)/src/input:/image_build_manager/src/input:rw \
-    -v $(pwd)/src/output:/image_build_manager/src/output:rw \
+    -v $(pwd)/src/input:/image_build_manager/input:rw \
+    -v $(pwd)/src/output:/image_build_manager/output:rw \
+    -v $(pwd)/log:/image_build_manager/log:rw \
     -v /run/podman/podman.sock:/run/podman/podman.sock \
     image_build_runner:1.0
 

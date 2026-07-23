@@ -124,7 +124,7 @@
         output_project_dir: "{{ standalone_config.output_dir }}/{{ standalone_config.project_name }}"
         project_name: "{{ standalone_config.project_name }}"
         admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
-        log_dir: "{{ standalone_config.log_dir | default('./log') }}"
+        log_dir: "{{ standalone_config.log_dir | default('/image_build_manager/log') }}"
         cacheable: true
 
 - name: Verify the project directory exists
