@@ -62,13 +62,17 @@
     - (provided_tags | intersect(skip_credential_tags)) | length > 0
 
 # --- Step 0.5: Detect execution mode ---
+# Standalone mode is true when config.yml exists at playbook_dir/../config.yml.
+# In Omnia mode, playbooks live under /omnia/src/ and no config.yml exists there.
+# NOTE: Do NOT check 'omnia_input_dir is defined' — it's always defined in vars/main.yml.
+- name: Check for standalone config.yml
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/../config.yml"
+  register: _standalone_config_file
+
 - name: Detect standalone mode
   ansible.builtin.set_fact:
-    standalone_mode: >-
-      {{ standalone_mode | default(false) | bool
-         or (lookup('file', playbook_dir + '/../config.yml', errors='ignore')
-             | default('') | length > 0
-             and not (omnia_input_dir is defined)) }}
+    standalone_mode: "{{ standalone_mode | default(false) | bool or _standalone_config_file.stat.exists }}"
     cacheable: true
 
 # --- Step 1: Upgrade guard (Omnia mode only) ---
@@ -161,6 +165,7 @@
   ansible.builtin.add_host:
     hostname: "{{ oim_host_group }}"
     ansible_host: "{{ standalone_config.build_host.hostname | default('localhost') }}"
+    ansible_connection: "{{ 'local' if standalone_config.build_host.hostname | default('localhost') == 'localhost' else 'ssh' }}"
     groups: "{{ oim_host_group }}"
   when: standalone_mode | bool
 
