@@ -1,0 +1,21 @@
+---
+# image_build_manager standalone configuration
+# Copy this file to config.yml and edit for your environment.
+#
+# This file replaces OIM metadata + default.yml in standalone mode.
+# RPM repos and OS version are in repo_status.yml (separate file).
+
+# Project settings
+project_name: "project_default"
+input_dir: "./input"
+output_dir: "./output"
+
+# Build host settings
+build_host:
+  hostname: "localhost"            # Build host — "localhost" for local builds
+  shared_path: "/opt/image_build"  # Local or NFS path for build artifacts
+  domain_name: "local"
+  admin_nic_ip: "10.20.0.1"       # Admin NIC IP (MinIO/S3 endpoint)
+
+# Logging
+log_dir: "./log"

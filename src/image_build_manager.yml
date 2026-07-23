@@ -102,15 +102,141 @@
   vars:
     _repo_status_path: "{{ repo_manager_output_path | default('') | ternary(repo_manager_output_path, output_project_dir + '/repo_manager/repo_status.yml') }}"
   tasks:
+    # --- Standalone mode: load repo_status.yml from local path ---
+    - name: Set repo_status path for standalone mode
+      ansible.builtin.set_fact:
+        _standalone_repo_status_path: "{{ playbook_dir }}/repo_status.yml"
+      when: standalone_mode | default(false) | bool
+
+    - name: Check if standalone repo_status.yml exists
+      ansible.builtin.stat:
+        path: "{{ _standalone_repo_status_path }}"
+      register: standalone_repo_status_file
+      when: standalone_mode | default(false) | bool
+
+    - name: Load standalone repo_status.yml
+      ansible.builtin.include_vars:
+        file: "{{ _standalone_repo_status_path }}"
+      when:
+        - standalone_mode | default(false) | bool
+        - standalone_repo_status_file.stat.exists | default(false)
+
+    - name: Set OS facts from repo_status.yml
+      ansible.builtin.set_fact:
+        cluster_os_type: "{{ cluster_os_type | default('rhel') }}"
+        cluster_os_version: "{{ cluster_os_version | default('10.0') }}"
+        cacheable: true
+      when:
+        - standalone_mode | default(false) | bool
+        - cluster_os_type is defined
+
+    - name: Build repo lists from standalone repo_status.yml
+      when:
+        - standalone_mode | default(false) | bool
+        - rpm_repos is defined
+      block:
+        - name: Initialize standalone repo lists
+          ansible.builtin.set_fact:
+            repo_manager_repos_x86_64: []
+            repo_manager_repos_aarch64: []
+            rpm_repos_aarch64: "{{ rpm_repos.aarch64 | default({}) }}"
+
+        - name: Build x86_64 repo list from standalone rpm_repos
+          ansible.builtin.set_fact:
+            repo_manager_repos_x86_64: "{{ repo_manager_repos_x86_64 + [{'name': item.key, 'base_url': item.value, 'gpg': ''}] }}"
+          loop: "{{ (rpm_repos.x86_64 | default({})) | dict2items }}"
+          loop_control:
+            loop_var: item
+
+        - name: Build aarch64 repo list from standalone rpm_repos
+          ansible.builtin.set_fact:
+            repo_manager_repos_aarch64: "{{ repo_manager_repos_aarch64 + [{'name': item.key, 'base_url': item.value, 'gpg': ''}] }}"
+          loop: "{{ (rpm_repos.aarch64 | default({})) | dict2items }}"
+          loop_control:
+            loop_var: item
+
+        - name: Build x86_64 repo list from standalone user_repos
+          ansible.builtin.set_fact:
+            repo_manager_repos_x86_64: "{{ repo_manager_repos_x86_64 + [{'name': item.key, 'base_url': item.value, 'gpg': ''}] }}"
+          loop: "{{ (user_repos.x86_64 | default({})) | dict2items }}"
+          loop_control:
+            loop_var: item
+          when: user_repos is defined
+
+        - name: Build aarch64 repo list from standalone user_repos
+          ansible.builtin.set_fact:
+            repo_manager_repos_aarch64: "{{ repo_manager_repos_aarch64 + [{'name': item.key, 'base_url': item.value, 'gpg': ''}] }}"
+          loop: "{{ (user_repos.aarch64 | default({})) | dict2items }}"
+          loop_control:
+            loop_var: item
+          when: user_repos is defined
+
+        - name: Make standalone repo lists cacheable
+          ansible.builtin.set_fact:
+            repo_manager_repos_x86_64: "{{ repo_manager_repos_x86_64 }}"
+            repo_manager_repos_aarch64: "{{ repo_manager_repos_aarch64 }}"
+            cacheable: true
+
+    - name: Set repo_manager facts from standalone repo_status.yml
+      when:
+        - standalone_mode | default(false) | bool
+        - repo_manager is defined
+      block:
+        - name: Validate standalone repo_status.yml has repo_manager section
+          ansible.builtin.assert:
+            that:
+              - repo_manager.certificates is defined
+              - repo_manager.certificates.server_crt is defined
+              - repo_manager.certificates.server_crt | length > 0
+              - repo_manager.port is defined
+            fail_msg: >
+              repo_status.yml is missing required 'repo_manager' section.
+              Ensure repo_manager.certificates.server_crt and repo_manager.port
+              are present in {{ _standalone_repo_status_path }}.
+            quiet: true
+
+        - name: Set pulp facts for standalone mode (use cert path as-is)
+          ansible.builtin.set_fact:
+            pulp_port: "{{ repo_manager.port }}"
+            pulp_cert_oim_path: "{{ repo_manager.certificates.server_crt }}"
+            cacheable: true
+
+        - name: Verify pulp cert file exists on standalone host
+          ansible.builtin.stat:
+            path: "{{ repo_manager.certificates.server_crt }}"
+          register: standalone_pulp_cert
+
+        - name: Fail if pulp cert not found on standalone host
+          ansible.builtin.fail:
+            msg: >
+              Pulp webserver certificate not found at {{ repo_manager.certificates.server_crt }}.
+              In standalone mode the certificate path in repo_status.yml must point
+              to an actual file on this host. Copy the cert from your repo_manager
+              host or update repo_status.yml with the correct path.
+          when: not standalone_pulp_cert.stat.exists | default(false)
+
+    # --- Omnia mode: load repo_status.yml from repo_manager output ---
     - name: Check if repo_status.yml exists
       ansible.builtin.stat:
         path: "{{ _repo_status_path }}"
       register: repo_status_file
+      when: not standalone_mode | default(false) | bool
 
     - name: Load repo_status.yml from repo_manager output
       ansible.builtin.include_vars:
         file: "{{ _repo_status_path }}"
-      when: repo_status_file.stat.exists
+      when:
+        - not standalone_mode | default(false) | bool
+        - repo_status_file.stat.exists | default(false)
+
+    - name: Set OS facts from repo_status.yml (Omnia mode)
+      ansible.builtin.set_fact:
+        cluster_os_type: "{{ cluster_os_type | default('rhel') }}"
+        cluster_os_version: "{{ cluster_os_version | default('10.0') }}"
+        cacheable: true
+      when:
+        - not standalone_mode | default(false) | bool
+        - cluster_os_type is defined
 
     - name: Fail if repo_manager has not completed
       ansible.builtin.fail:
@@ -118,6 +244,7 @@
           repo_status.yml not found at {{ _repo_status_path }} or overall_status != 'success'.
           Run repo_manager first: cd ../repo_manager && ansible-playbook repo_manager.yml
       when: >
+        not standalone_mode | default(false) | bool and
         repo_manager_output_path | default('') | length > 0 and
         (not repo_status_file.stat.exists or overall_status | default('') != 'success')
 
@@ -134,7 +261,9 @@
           Ensure repo_manager produces repo_manager.certificates.server_crt
           and repo_manager.port in {{ _repo_status_path }}.
         quiet: true
-      when: repo_manager_output_path | default('') | length > 0
+      when:
+        - not standalone_mode | default(false) | bool
+        - repo_manager_output_path | default('') | length > 0
 
     - name: Set repo_manager facts from repo_status.yml
       ansible.builtin.set_fact:
@@ -142,6 +271,7 @@
         pulp_cert_oim_path: "{{ repo_manager.certificates.server_crt | regex_replace('^/opt/omnia/', oim_shared_path + '/omnia/') }}"
         cacheable: true
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - repo_manager is defined
 
@@ -151,6 +281,7 @@
         repo_manager_repos_aarch64: []
         rpm_repos_aarch64: "{{ rpm_repos.aarch64 | default({}) }}"
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - rpm_repos is defined
 
@@ -161,6 +292,7 @@
       loop_control:
         loop_var: item
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - rpm_repos is defined
 
@@ -171,6 +303,7 @@
       loop_control:
         loop_var: item
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - user_repos is defined
 
@@ -181,6 +314,7 @@
       loop_control:
         loop_var: item
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - rpm_repos is defined
 
@@ -191,6 +325,7 @@
       loop_control:
         loop_var: item
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - user_repos is defined
 
@@ -200,6 +335,7 @@
         repo_manager_repos_aarch64: "{{ repo_manager_repos_aarch64 }}"
         cacheable: true
       when:
+        - not standalone_mode | default(false) | bool
         - repo_manager_output_path | default('') | length > 0
         - rpm_repos is defined
 
@@ -211,7 +347,9 @@
           - "x86_64 repos: {{ repo_manager_repos_x86_64 | length }} loaded"
           - "aarch64 repos: {{ repo_manager_repos_aarch64 | length }} loaded"
         verbosity: 1
-      when: repo_manager_output_path | default('') | length > 0
+      when:
+        - not standalone_mode | default(false) | bool
+        - repo_manager_output_path | default('') | length > 0
 
 
 # =========================================================================

@@ -41,7 +41,7 @@ minio_firewall_ports:
 # ---------------------------------------------------------------------------
 registry_service_name: "registry"
 registry_quadlet_file: "/etc/containers/systemd/registry.container"
-registry_storage_dir: "/opt/omnia/registry/data"
+registry_storage_dir: "{{ oim_shared_path }}/registry/data"
 registry_oci_data_dir: "{{ oim_shared_path }}/omnia/image_build_manager/oci/data"
 registry_cleanup_directories:
   - "{{ registry_storage_dir }}"

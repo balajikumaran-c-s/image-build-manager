@@ -20,7 +20,6 @@ local_repo_check_msg: |
   Please make sure that local_repo.yml playbook is executed successfully.
 input_project_dir: "{{ hostvars['localhost']['input_project_dir'] }}"
 functional_groups_file_path: "{{ hostvars['localhost']['functional_groups_config_path'] | default('/opt/omnia/.data/functional_groups_config.yml') }}"
-software_config_file_path: "{{ input_project_dir }}/software_config.json"
 
 # Architecture-agnostic variables — build_arch is set by the calling playbook
 build_image_completion_msg: |

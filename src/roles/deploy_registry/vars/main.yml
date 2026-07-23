@@ -20,7 +20,7 @@ data_oci_dir: "{{ oim_shared_path }}/omnia/image_build_manager/oci/data"
 
 # Registry container settings
 registry_port: 5000
-registry_storage_dir: "/opt/omnia/registry/data"
+registry_storage_dir: "{{ oim_shared_path }}/registry/data"
 registry_image: "docker.io/library/registry:2"
 registry_tag: "2"
 

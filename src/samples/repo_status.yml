@@ -28,59 +28,88 @@
 #   4. repo_manager section contains certificate and port
 # ============================================================================
 
-overall_status: "success"
+overall_status: success
 
-# OS metadata — tells consumers what OS the repos were synced for
-# These fields are used by image_build_manager to determine the build target OS.
-# In Omnia mode, repo_manager sets these from the cluster config.
-# In standalone mode, the user sets these manually.
+# OS metadata — tells image_build_manager the build target OS
 cluster_os_type: "rhel"
 cluster_os_version: "10.0"
 
-# Base URLs for other content types
-tarball_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/tarballs/"
-manifest_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/manifests/"
-pip_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/pip/"
-git_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/git/"
+# Repo sync status
+repo_config: "partial"
 
+# repo_manager connection details
 repo_manager:
   port: 2225
   certificates:
-    server_crt: "/opt/omnia/pulp/settings/certs/pulp_webserver.crt"
-    server_key: "/opt/omnia/pulp/settings/certs/pulp_webserver.key"
-    certs_dir: "/opt/omnia/pulp/settings/certs"
+    server_crt: /opt/omnia/pulp/settings/certs/pulp_webserver.crt
+    server_key: /opt/omnia/pulp/settings/certs/pulp_webserver.key
+    certs_dir: /opt/omnia/pulp/settings/certs
 
-# RPM Repository Base URLs
+# RPM Repository Base URLs (keyed by architecture)
 rpm_repos:
   x86_64:
-    # Base RHEL Repositories
-    baseos: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_baseos/"
-    appstream: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_appstream/"
-    codeready_builder: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_codeready-builder/"
-    # Additional Repositories
-    epel: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_epel/"
-    doca: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_doca/"
-    # Additional repos from production
-    omnia-additional: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_omnia-additional/"
-    nvidia-hpc-sdk: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_nvidia-hpc-sdk/"
-    cuda: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_cuda/"
-    cri-o-v1-35: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_cri-o-v1-35/"
-    kubernetes-v1-35: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_kubernetes-v1-35/"
-    docker-ce: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_docker-ce/"
-    cri-o: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_cri-o/"
-    kubernetes: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_kubernetes/"
+    repo_manager_additional: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_repo_manager-additional/
+    nvidia_hpc_sdk: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_nvidia-hpc-sdk/
+    cuda: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_cuda/
+    doca: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_doca/
+    cri_o_v1_35: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_cri-o-v1-35/
+    kubernetes_v1_35: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_kubernetes-v1-35/
+    epel: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_epel/
+    docker_ce: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_docker-ce/
+    codeready_builder: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_codeready-builder/
+    baseos: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_baseos/
+    appstream: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_appstream/
+    slurm_custom: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_slurm_custom/
   aarch64:
-    # Base RHEL Repositories
-    baseos: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_baseos/"
-    appstream: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_appstream/"
-    codeready_builder: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_codeready-builder/"
-    # Additional Repositories
-    epel: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_epel/"
-    doca: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_doca/"
+    repo_manager_additional: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_repo_manager-additional/
 
-# User-Defined Repositories (from local_repo_config.yml)
+# File-based content repos (tarballs, manifests, git, pip)
+file_repos:
+  x86_64:
+    tarball:
+      sionlib: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/sionlib/
+      papi: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/papi/
+      msr_safe: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/msr-safe/
+      likwid: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/likwid/
+      geopm: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/geopm/
+      osu_micro_benchmarks: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/osu-micro-benchmarks/
+      imb: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/imb/
+      helm_v3_20_1_amd64: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/helm-v3.20.1-amd64/
+      nfs_subdir_external_provisioner_4_0_18: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/nfs-subdir-external-provisioner-4.0.18/
+      victoria_metrics_operator_0_59_3: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/victoria-metrics-operator-0.59.3/
+      strimzi_kafka_operator_helm_3_chart_1_0_1: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/strimzi-kafka-operator-helm-3-chart-1.0.1/
+      cert_manager_v1_10_0: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/cert-manager-v1.10.0/
+    manifest:
+      calico_v3_31_4: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/manifest/calico-v3.31.4/
+      metallb_native_v0_15_3: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/manifest/metallb-native-v0.15.3/
+    git:
+      helm_charts: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/git/helm-charts/
+      karavi_observability: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/git/karavi-observability/
+    pip_module:
+      PyMySQL_1_1_2: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/PyMySQL==1.1.2/
+      prettytable_3_14_0: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/prettytable==3.14.0/
+      kubernetes_33_1_0: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/kubernetes==33.1.0/
+      omsdk_1_2_518: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/omsdk==1.2.518/
+      prometheus_client_0_20_0: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/prometheus_client==0.20.0/
+      cffi_1_17_1: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/cffi==1.17.1/
+      cryptography_45_0_7: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/cryptography==45.0.7/
+  aarch64: {}
+
+# User-defined custom repos
 user_repos:
   x86_64:
-    slurm_custom: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_slurm_custom/"
-  aarch64:
-    slurm_custom: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_repo/cluster/aarch64/rhel/10.0/rpms/aarch64_rhel_10.0_slurm_custom/"
+    slurm_custom: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/rpms/x86_64_rhel_10.0_slurm_custom/
+  aarch64: {}
+
+# Base URL shortcuts
+tarball_base_url: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/
+manifest_base_url: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/manifest/
+pip_base_url: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/
+git_base_url: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/git/
+offline_tarball_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/tarball/
+offline_manifest_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/manifest/
+offline_pip_module_path: https://{{ admin_nic_ip }}:2225/pypi/offline_repo/cluster/x86_64/rhel/10.0/pip_module/
+offline_git_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/git/
+offline_shell_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/shell/
+offline_iso_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/iso/
+offline_ansible_galaxy_collection_path: https://{{ admin_nic_ip }}:2225/pulp/content/offline_repo/cluster/x86_64/rhel/10.0/ansible_galaxy_collection/

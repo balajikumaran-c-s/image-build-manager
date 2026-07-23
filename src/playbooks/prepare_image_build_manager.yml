@@ -62,6 +62,7 @@
         tasks_from: preflight_selinux_check.yml
 
     - name: Update omnia.target with image_build_manager services
+      when: not hostvars['localhost']['standalone_mode'] | default(false) | bool
       block:
         - name: Check if omnia.target exists
           ansible.builtin.stat:

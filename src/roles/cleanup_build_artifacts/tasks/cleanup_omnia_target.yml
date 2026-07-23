@@ -14,13 +14,21 @@
 ---
 # cleanup_omnia_target.yml — Remove minio.service and registry.service from omnia.target.
 
+- name: Skip omnia.target cleanup in standalone mode
+  ansible.builtin.debug:
+    msg: "Standalone mode — skipping omnia.target cleanup"
+  when: hostvars['localhost']['standalone_mode'] | default(false) | bool
+
 - name: Check if omnia.target exists
   ansible.builtin.stat:
     path: "{{ omnia_target_path }}"
   register: omnia_target_check
+  when: not hostvars['localhost']['standalone_mode'] | default(false) | bool
 
 - name: Remove image_build_manager services from omnia.target
-  when: omnia_target_check.stat.exists
+  when:
+    - not hostvars['localhost']['standalone_mode'] | default(false) | bool
+    - omnia_target_check.stat.exists | default(false)
   block:
     - name: Remove minio.service from omnia.target Requires line
       ansible.builtin.replace:
