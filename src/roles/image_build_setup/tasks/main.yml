@@ -160,6 +160,12 @@
     state: directory
     mode: '0755'
 
+- name: Ensure log directory exists
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/log"
+    state: directory
+    mode: '0755'
+
 # --- Step 3a: Load OIM metadata (Omnia mode — NOT SUPPORTED, guarded by standalone_mode) ---
 - name: Include oim metadata vars
   ansible.builtin.include_vars: "{{ omnia_metadata_file_path }}"
