@@ -406,8 +406,8 @@ COPY requirements.yml /opt/image_build_manager/requirements.yml
 RUN ansible-galaxy collection install -r /opt/image_build_manager/requirements.yml
 
 RUN sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
-EXPOSE 2222
+    sed -i 's/^#Port 22/Port 2230/' /etc/ssh/sshd_config
+EXPOSE 2230
 RUN ssh-keygen -A
 
 COPY . /image_build_manager/
@@ -442,7 +442,7 @@ exec tail -f /dev/null
 podman build -t image_build_runner:1.0 -f containers/Containerfile .
 
 # Start (long-running — stays alive)
-podman run -d --name image_build_mgr --privileged -p 2222:2222 \
+podman run -d --name image_build_mgr --privileged -p 2230:2230 \
     -v ./config.yml:/image_build_manager/config.yml:ro \
     -v ./repo_status.yml:/image_build_manager/repo_status.yml:ro \
     -v ./input:/image_build_manager/input:rw \

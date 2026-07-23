@@ -52,7 +52,7 @@ ansible-playbook image_build_manager.yml                    # Full flow (all tag
 podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
 
 # Start (long-running — stays alive with sshd)
-podman run -d --name image_build_mgr --privileged -p 2222:2222 \
+podman run -d --name image_build_mgr --privileged -p 2230:2230 \
     -v ./config.yml:/image_build_manager/config.yml:ro \
     -v ./src/repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
     -v ./input:/image_build_manager/input:rw \
@@ -186,7 +186,7 @@ image-build-manager/
         ├── build_images.sh      # Build script for image containers
         ├── image_builder/       # OpenCHAMI image builder container (ochami)
         └── image_build_runner/  # Domain runner container (sshd, long-running)
-            ├── Containerfile    # Wolfi-based, Python 3.13, ansible-core 2.20+
+            ├── Containerfile    # Wolfi-based, Python 3.13, SSH port 2230 (configurable)
             └── entrypoint.sh    # Starts sshd + keeps container alive
 ```
 

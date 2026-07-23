@@ -19,7 +19,7 @@
 #   podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
 #
 # Run:
-#   podman run -d --name image_build_mgr --privileged -p 2222:2222 \
+#   podman run -d --name image_build_mgr --privileged -p 2230:2230 \
 #       -v ./config.yml:/image_build_manager/config.yml:ro \
 #       -v ./repo_status.yml:/image_build_manager/src/repo_status.yml:ro \
 #       -v ./input:/image_build_manager/input:rw \
@@ -48,10 +48,12 @@ RUN pip install --no-cache-dir -r /opt/image_build_manager/requirements.txt
 COPY requirements.yml /opt/image_build_manager/requirements.yml
 RUN ansible-galaxy collection install -r /opt/image_build_manager/requirements.yml
 
-# Configure sshd for container access
+# Configure sshd for container access (port configurable via --build-arg SSH_PORT=NNNN)
+ARG SSH_PORT=2230
+ENV SSH_PORT=${SSH_PORT}
 RUN sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
-EXPOSE 2222
+    sed -i "s/^#Port 22/Port ${SSH_PORT}/" /etc/ssh/sshd_config
+EXPOSE ${SSH_PORT}
 RUN ssh-keygen -A
 
 # Copy source code

@@ -354,7 +354,7 @@ different tags. The container does **NOT** run-and-exit.
   │────────────────────────────────>│ ┌──────────────────────────┐
   │                                 │ │ entrypoint.sh:           │
   │                                 │ │  1. ssh-keygen -A        │
-  │                                 │ │  2. Start sshd on :2222  │
+  │                                 │ │  2. Start sshd on :2230  │
   │                                 │ │  3. cd /image_build_mgr  │
   │                                 │ │  4. Wait (sshd keeps     │
   │                                 │ │     container alive)     │
@@ -386,7 +386,7 @@ different tags. The container does **NOT** run-and-exit.
   │────────────────────────────────>│ → debug, inspect logs
   │                                 │
   │  # OR via SSH                  │
-  │  ssh -p 2222 root@localhost    │
+  │  ssh -p 2230 root@localhost    │
   │────────────────────────────────>│ → same access via SSH
   │                                 │
   │  podman stop <cid>             │
@@ -434,9 +434,9 @@ RUN ansible-galaxy collection install -r /opt/image_build_manager/requirements.y
 # ── SSH configuration (same pattern as omnia_core) ──────────
 RUN sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
     sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
-    sed -i 's/^#Port 22/Port 2222/' /etc/ssh/sshd_config
+    sed -i 's/^#Port 22/Port 2230/' /etc/ssh/sshd_config
 
-EXPOSE 2222
+EXPOSE 2230
 RUN ssh-keygen -A
 
 # ── Directory setup ─────────────────────────────────────────
@@ -476,7 +476,7 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 echo "================================================="
 echo " image_build_manager container ready"
-echo " SSH: ssh -p 2222 root@<host>"
+echo " SSH: ssh -p 2230 root@<host>"
 echo " Exec: podman exec -it <cid> bash"
 echo "================================================="
 echo ""
@@ -505,7 +505,7 @@ podman build -t image_build_runner:1.0 -f containers/Containerfile .
 # ═══════════════════════════════════════════════════════════
 podman run -d --name image_build_mgr \
   --privileged \
-  -p 2222:2222 \
+  -p 2230:2230 \
   -v ./config.yml:/image_build_manager/config.yml:ro \
   -v ./repo_status.yml:/image_build_manager/repo_status.yml:ro \
   -v ./input:/image_build_manager/input:rw \
@@ -545,7 +545,7 @@ podman exec -it image_build_mgr \
 podman exec -it image_build_mgr bash
 
 # OR via SSH
-ssh -p 2222 root@localhost
+ssh -p 2230 root@localhost
 
 # ═══════════════════════════════════════════════════════════
 # Step 5: Stop and remove when done
@@ -904,7 +904,7 @@ podman build -t image_build_runner:1.0 -f containers/Containerfile .
 # Start container (long-running — stays alive)
 podman run -d --name image_build_mgr \
   --privileged \
-  -p 2222:2222 \
+  -p 2230:2230 \
   -v ./config.yml:/image_build_manager/config.yml:ro \
   -v ./repo_status.yml:/image_build_manager/repo_status.yml:ro \
   -v ./input:/image_build_manager/input:rw \

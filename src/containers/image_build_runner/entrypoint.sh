@@ -23,6 +23,7 @@ mkdir -p /image_build_manager/log
 
 echo "============================================"
 echo " image_build_manager container ready"
+echo " SSH port: ${SSH_PORT:-2230}"
 echo "============================================"
 echo ""
 echo "Run playbooks via:"
