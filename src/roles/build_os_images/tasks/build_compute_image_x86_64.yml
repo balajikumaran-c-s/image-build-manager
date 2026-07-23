@@ -21,6 +21,12 @@
     - (build_stream_job_id | default('') | length) > 0
     - (image_key | default('') | length) > 0
 
+- name: Ensure workdir images directory exists
+  ansible.builtin.file:
+    path: "{{ openchami_work_dir }}/images"
+    state: directory
+    mode: "{{ dir_permissions_755 }}"
+
 - name: Ensure log directory exists
   ansible.builtin.file:
     path: "{{ image_build_log_dir }}"
