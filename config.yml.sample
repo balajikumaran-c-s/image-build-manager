@@ -14,7 +14,7 @@
 project_name: "project_default"
 
 build_host:
-  hostname: "localhost"            # For cluster naming (standalone always runs locally)
+  hostname: "myhost"               # Short hostname only (NOT FQDN). domain_name is appended automatically.
   shared_path: "/opt/image_build"  # Persistent storage for MinIO + Registry data
-  domain_name: "local"
+  domain_name: "local"             # Domain suffix. Registry = hostname.domain_name:5000
   admin_nic_ip: "10.20.0.1"       # Admin NIC IP — Pulp and S3 endpoint

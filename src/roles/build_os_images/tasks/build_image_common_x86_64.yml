@@ -27,6 +27,17 @@
     base_image_packages: "{{ hostvars['localhost']['base_image_packages'] }}"
     compute_images_dict: "{{ hostvars['localhost']['compute_images_dict'] }}"
 
+- name: Compute registry host (avoid doubled domain in FQDN)
+  vars:
+    _node: "{{ oim_node_name }}"
+    _domain: "{{ domain_name }}"
+  ansible.builtin.set_fact:
+    registry_host: "{{ _node if _node.endswith('.' + _domain) else _node + '.' + _domain }}"
+
+- name: Set standalone defaults for Mode C vars
+  ansible.builtin.set_fact:
+    omnia_share_option: "{{ hostvars['localhost']['omnia_share_option'] | default('Local') }}"
+
 - name: Normalize build stream inputs for base image
   ansible.builtin.set_fact:
     enable_build_stream: "{{ hostvars['localhost']['enable_build_stream'] | default(false) | bool }}"
