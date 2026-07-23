@@ -34,9 +34,9 @@
   ansible.builtin.set_fact:
     registry_host: "{{ _node if _node.endswith('.' + _domain) else _node + '.' + _domain }}"
 
-- name: Set standalone defaults for Mode C vars
-  ansible.builtin.set_fact:
-    omnia_share_option: "{{ hostvars['localhost']['omnia_share_option'] | default('Local') }}"
+# - name: Set standalone defaults for Mode C vars
+#   ansible.builtin.set_fact:
+#     omnia_share_option: "{{ hostvars['localhost']['omnia_share_option'] | default('Local') }}"
 
 - name: Normalize build stream inputs for base image
   ansible.builtin.set_fact:

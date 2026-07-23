@@ -29,15 +29,15 @@
     msg: "{{ admin_aarch64_count_error_msg }}"
   when: groups['admin_aarch64'] | length != 1
 
-# Validate share option
-- name: Set share option fact
-  ansible.builtin.set_fact:
-    omnia_share_option: "{{ hostvars['localhost']['omnia_share_option'] }}"
+# # Validate share option
+# - name: Set share option fact
+#   ansible.builtin.set_fact:
+#     omnia_share_option: "{{ hostvars['localhost']['omnia_share_option'] }}"
 
-- name: Fail if share option is not NFS
-  ansible.builtin.fail:
-    msg: "{{ nfs_not_configured_msg }}"
-  when: omnia_share_option != "NFS"
+# - name: Fail if share option is not NFS
+#   ansible.builtin.fail:
+#     msg: "{{ nfs_not_configured_msg }}"
+#   when: omnia_share_option != "NFS"
 
 # Set OIM PXE IP from admin_nic_ip
 - name: Set PXE IP fact
