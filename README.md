@@ -4,98 +4,104 @@ Build OS images (x86_64 + aarch64) for HPC cluster provisioning using OpenCHAMI.
 Deploys MinIO (S3) + local container registry, builds base and compute images,
 and writes `build_status.yml` with S3 artifact paths.
 
-**Fully standalone** — no dependency on Omnia mono-repo, `software_config.json`,
-or `provision_config.yml`. All inputs are self-contained in this repository.
+**Runs directly on a RHEL host** with Ansible + Python (Mode A — bare-metal).
+No container runtime required for the playbook itself (Podman is used for image builds).
 
-## Execution Modes
+## Prerequisites
 
-| Mode | Description | Config Source |
-|------|-------------|---------------|
-| **A — Bare-metal** | Run directly on a RHEL host with Ansible + Python | `config.yml` + `repo_status.yml` |
-| **B — Container** | Run inside a long-running domain container | Mounted `config.yml` + `repo_status.yml` |
+| Requirement | Minimum | Validated |
+|------------|---------|-----------|
+| OS | RHEL 10.x, Rocky 10.x | RHEL 10.0 |
+| Python | 3.12+ | 3.12.8 |
+| Ansible | ansible-core 2.20+ | 2.20.0 |
+| Container runtime | Podman 5.0+ | 5.3.1 |
+| Disk space | 50 GB free | — |
 
-> **Mode C (Omnia mono-repo)** is **NOT SUPPORTED**. Mode C code is commented out
-> and guarded by `standalone_mode` checks. All references are kept for historical context.
+### Ansible Installation
+
+**Fresh install (recommended)**:
+
+```bash
+python3 -m venv ~/.venvs/image-build
+source ~/.venvs/image-build/bin/activate
+pip install -r requirements.txt
+ansible-galaxy collection install -r requirements.yml
+```
+
+**If Ansible is already installed**:
+
+```bash
+# Check version — must be ansible-core >= 2.20
+ansible --version
+
+# If older, use a virtual environment to avoid conflicts:
+python3 -m venv ~/.venvs/image-build
+source ~/.venvs/image-build/bin/activate
+pip install -r requirements.txt
+```
+
+**Verify**:
+
+```bash
+ansible --version          # ansible-core 2.20+
+ansible-galaxy collection list | grep containers.podman
+```
 
 ## Quick Start
 
-### Mode A — Bare-metal (standalone)
-
 ```bash
-# 1. Install dependencies
+# 1. Configure
+cp config.yml.sample config.yml
+# Edit config.yml — set admin_nic_ip, shared_path, domain_name, hostname
+
+# 2. Install dependencies
+python3 -m venv ~/.venvs/image-build
+source ~/.venvs/image-build/bin/activate
 pip install -r requirements.txt
 ansible-galaxy collection install -r requirements.yml
 
-# 2. Configure
-cp config.yml.sample config.yml
-# Edit config.yml — set admin_nic_ip, shared_path, domain_name
+# 3. Ensure repo_manager output directory exists
+# Production: /opt/omnia/repo_manager/output/<project_name>/ must contain:
+#   repo_status.yml               — from repo_manager
+#   functional_group_packages.yml — package mapping
+# Set repo_manager_output_dir in image_build_config.yml to this directory
 
-# 3. Copy repo_manager output
-# repo_status.yml is already in src/input/project_default/repo_manager_output/
-# Edit it — replace {{ admin_nic_ip }} with actual IP
-# Copy Pulp certs from your repo_manager host:
-cp /path/to/pulp_webserver.crt src/input/project_default/repo_manager_output/certs/
-cp /path/to/pulp_webserver.key src/input/project_default/repo_manager_output/certs/
-
-# 4. Review functional_group_packages.yml (RPM package mapping)
-# Edit src/input/project_default/repo_manager_output/functional_group_packages.yml
-# Add/remove RPM packages per functional group as needed
-
-# 5. Edit image_build_config.yml
-# Enable functional groups you want to build
+# 4. Edit image_build_config.yml — enable functional groups to build
 vi src/input/project_default/image_build_config.yml
 
-# 6. Run
-export ANSIBLE_LOG_PATH=$(pwd)/log/image_build_manager.log
+# 5. Run
 cd src
-ansible-playbook image_build_manager.yml --tags validate
-ansible-playbook image_build_manager.yml --tags prepare
-ansible-playbook image_build_manager.yml --tags build
-```
-
-### Mode B — Container
-
-All paths auto-derived — only 4 mounts needed.
-
-```bash
-# 1. Configure (same as Mode A steps 2-5)
-cp config.yml.sample config.yml
-# Edit config.yml, repo_status.yml, functional_group_packages.yml, image_build_config.yml
-
-# 2. Build container
-podman build -t image_build_runner:1.0 -f src/containers/image_build_runner/Containerfile .
-
-# 3. Start
-mkdir -p /opt/image_build
-podman run -d --name image_build_mgr --privileged -p 2230:2230 \
-    -v $(pwd)/config.yml:/image_build_manager/config.yml:ro \
-    -v $(pwd)/src:/image_build_manager/src:rw \
-    -v /opt/image_build:/opt/image_build:rw \
-    -v /run/podman/podman.sock:/run/podman/podman.sock \
-    -v /root/.ssh:/host_ssh:ro \
-    image_build_runner:1.0
-
-# 4. Run
-podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags validate
-podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags prepare
-podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags build
-podman exec -it image_build_mgr ansible-playbook image_build_manager.yml --tags cleanup
-
-# Debug / Stop
-podman exec -it image_build_mgr bash
-podman stop image_build_mgr && podman rm image_build_mgr
+ansible-playbook image_build_manager.yml --tags validate   # Validate config
+ansible-playbook image_build_manager.yml --tags prepare    # Deploy MinIO + Registry
+ansible-playbook image_build_manager.yml --tags build      # Build OS images
+ansible-playbook image_build_manager.yml --tags cleanup    # Remove everything
 ```
 
 ## Input Files
 
 | File | Location | Required | Description |
 |------|----------|----------|-------------|
-| `config.yml` | Repo root | Yes | Project + build host settings |
+| `config.yml` | Repo root | Yes | Host + project settings |
 | `image_build_config.yml` | `src/input/project_default/` | Yes | S3 config, functional groups, build settings |
-| `repo_status.yml` | `src/input/project_default/repo_manager_output/` | Yes | RPM repo URLs + OS metadata |
-| `functional_group_packages.yml` | `src/input/project_default/repo_manager_output/` | Yes | **Functional group → RPM package mapping** |
-| Pulp certs | `src/input/project_default/repo_manager_output/certs/` | Yes | Pulp TLS certificates |
+| `repo_status.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | Yes | RPM repo URLs + OS metadata + cert paths |
+| `functional_group_packages.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | Yes | **Functional group → RPM package mapping** |
 | `image_build_credentials.yml` | Auto-generated in project dir | Yes (except validate/cleanup) | S3 + provision credentials |
+
+### Certificate Handling
+
+Certificates are referenced by **absolute paths** in `repo_status.yml`:
+
+```yaml
+repo_manager:
+  port: 2225
+  certificates:
+    server_crt: /opt/omnia/pulp/settings/certs/pulp_webserver.crt
+    server_key: /opt/omnia/pulp/settings/certs/pulp_webserver.key
+    certs_dir: /opt/omnia/pulp/settings/certs
+```
+
+The playbook reads the cert path directly from `repo_status.yml` and validates the file
+exists on the host. No staging or copying is needed — the cert is used as-is.
 
 ## Package Resolution Flow
 
@@ -130,21 +136,21 @@ single source of truth for which RPM packages belong to each functional group.
 
 ### `config.yml`
 
-Project and build host settings for standalone mode. See `config.yml.sample`.
+Host and project settings. See `config.yml.sample`.
 
 | Field | Description | Default |
 |-------|-------------|---------|
 | `project_name` | Project name (maps to input/output dirs) | `project_default` |
-| `build_host.hostname` | Hostname for cluster naming (always runs locally) | `localhost` |
-| `build_host.shared_path` | Persistent storage for MinIO + Registry | `/opt/image_build` |
-| `build_host.domain_name` | Domain name for the build host | `local` |
-| `build_host.admin_nic_ip` | Admin NIC IP (Pulp and S3 endpoint) | — |
+| `host.hostname` | Short hostname (NOT FQDN) — domain_name appended | `localhost` |
+| `host.shared_path` | Persistent storage for MinIO + Registry data | `/opt/omnia/image_build_manager` |
+| `host.domain_name` | Domain suffix for registry naming | `local` |
+| `host.admin_nic_ip` | Admin NIC IP (Pulp and S3 endpoint) | — |
 
 ### `image_build_config.yml`
 
 Per-domain configuration. Key sections:
 - **`s3_configurations`** — S3 provider (minio or powerscale)
-- **`repo_manager_output_path`** — path to `repo_manager_output/` directory
+- **`repo_manager_output_dir`** — directory with `repo_status.yml` + `functional_group_packages.yml` (default: `/opt/omnia/repo_manager/output/project_default`)
 - **`functional_groups`** — image variants to build (e.g., `os_x86_64`, `slurm_node_x86_64`)
 - **`aarch64_inventory_host_ip`** — ARM build host (leave empty to skip aarch64)
 - **`build_image`** — async/retry/delay settings
@@ -175,13 +181,14 @@ Package names must match what is available in the Pulp RPM repos defined in `rep
 
 ### `repo_status.yml`
 
-Produced by `repo_manager`. Contains RPM repo URLs, OS metadata, and certificates.
-In standalone mode, copy this from your repo_manager output or create manually.
+Produced by `repo_manager` at `/opt/omnia/repo_manager/output/repo_status.yml`.
+Contains RPM repo URLs, OS metadata, and certificate paths (absolute).
 
 Key fields consumed by image_build_manager:
 - **`cluster_os_type`** / **`cluster_os_version`** — build target OS
 - **`rpm_repos.x86_64`** / **`rpm_repos.aarch64`** — RPM repository URLs
-- **`repo_manager.port`** / **`repo_manager.certificates`** — Pulp connection
+- **`repo_manager.port`** — Pulp HTTPS port (default: 2225)
+- **`repo_manager.certificates.server_crt`** — absolute path to Pulp TLS cert
 
 See `src/input/project_default/repo_manager_output/repo_status.yml` for the full structure.
 
@@ -196,28 +203,19 @@ See `src/input/project_default/repo_manager_output/repo_status.yml` for the full
 | `upgrade` | Upgrade flow |
 | `rollback` | Rollback flow |
 
-## Makefile Targets
+## Output Paths
 
-Run from the repo root:
+All runtime output goes to `<shared_path>/` (default: `/opt/omnia/image_build_manager/`):
 
-| Target | Command | Description |
-|--------|---------|-------------|
-| `make help` | — | Show all available targets |
-| `make setup` | `pip install + ansible-galaxy` | Install Python and Ansible dependencies |
-| `make lint` | `ansible-lint` | Lint all playbooks |
-| `make test` | `pytest` | Run unit tests |
-| `make build` | `podman build` | Build the `image_build_runner` container image |
-| `make clean` | `rm -rf` | Remove output/, log/, *.retry files |
-
-## Prerequisites
-
-| Requirement | Minimum |
-|------------|---------|
-| OS | RHEL 10.x, Rocky 10.x |
-| Python | 3.13+ |
-| Ansible | ansible-core 2.20+ |
-| Container runtime | Podman 4.0+ |
-| Disk space | 50 GB free |
+| Path | Purpose |
+|------|---------|
+| `<shared_path>/output/<project_name>/` | Build output (`build_status.yml`) |
+| `<shared_path>/log/<project_name>/` | Build logs (base/compute image logs) |
+| `<shared_path>/log/image_build_manager.log` | Ansible playbook log |
+| `<shared_path>/s3/` | MinIO S3 data |
+| `<shared_path>/registry/` | Local container registry storage |
+| `<shared_path>/oci/` | OCI image data |
+| `<shared_path>/workdir/` | OpenCHAMI image build workdir |
 
 ## CI/CD Pipeline
 
@@ -232,57 +230,69 @@ The `.github/workflows/ci.yml` runs on push/PR to `main`:
 ```
 image-build-manager/
 ├── README.md                    # This file
-├── config.yml.sample            # Sample standalone config
+├── CODING_RULES.md              # Developer coding rules and conventions
+├── config.yml.sample            # Sample config (host + project settings)
 ├── requirements.txt             # Python dependencies (ansible-core>=2.20)
 ├── requirements.yml             # Ansible collections
-├── Makefile                     # help, setup, lint, test, build, clean
 ├── .gitignore
 ├── .github/workflows/ci.yml    # CI pipeline
-├── docs/                        # Design documents and user guides
+├── docs/                        # All documentation (see docs/README.md)
+│   ├── README.md                # Documentation index
+│   ├── design/                  # Architecture and design documents
+│   │   ├── standalone-mode-a.md # Mode A bare-metal design
+│   │   └── omnia-domain-repo-design.md # Generic Omnia domain standard
+│   ├── code-style/              # Code style guides
+│   │   ├── ansible.md           # Ansible/YAML style guide
+│   │   ├── python.md            # Python style guide
+│   │   ├── jinja2.md            # Jinja2 template style guide
+│   │   └── general.md           # General code style
+│   ├── contracts/               # Input/output contracts
+│   ├── migration/               # Migration history from Omnia mono-repo
 │   ├── architecture.md          # Architecture overview
-│   ├── package-mapping-guide.md # How to customize packages per functional group
+│   ├── package-mapping-guide.md # Package customization guide
 │   └── troubleshooting.md       # Common issues and fixes
 ├── test/                        # Unit and integration tests
-│   ├── conftest.py              # Pytest fixtures
-│   ├── test_functional_group_packages.py
-│   └── test_validate_image_build_config.py
 └── src/
     ├── ansible.cfg              # Ansible configuration
-    ├── image_build_manager.yml  # Main playbook entry point
-    ├── STANDALONE_REPO_DESIGN.md  # Detailed design document
-    ├── INPUT_CONTRACT.md        # Input file specifications
-    ├── OUTPUT_CONTRACT.md       # Output file specifications
+    ├── image_build_manager.yml  # Main playbook entry point (roles + imports only)
     ├── roles/                   # All Ansible roles
-    │   ├── image_build_setup/         # Mode detection, config loading, OIM group
+    │   ├── image_build_setup/         # Config, validation, prereqs, repo loading
+    │   │   └── tasks/
+    │   │       ├── main.yml               # Dispatcher (includes below)
+    │   │       ├── validate_tags.yml      # Tag validation
+    │   │       ├── load_config.yml        # Load config.yml + host validation
+    │   │       ├── validate_prereqs.yml   # Prerequisite file checks
+    │   │       └── load_repo_status.yml   # Load repo_status + build repo lists
     │   ├── validate_image_build_input/ # Schema + logic validation
     │   ├── validate_build_runtime/    # Runtime pre-checks
     │   ├── collect_build_credentials/ # Interactive credential prompts
-    │   ├── deploy_minio/              # MinIO S3 deployment
-    │   ├── deploy_registry/           # Local container registry
+    │   ├── deploy_minio/              # MinIO S3 deployment (Quadlet)
+    │   ├── deploy_registry/           # Local container registry (Quadlet)
     │   ├── fetch_build_packages/      # Package resolution from mapping file
-    │   ├── build_os_images/           # OpenCHAMI image build
+    │   ├── build_os_images/           # OpenCHAMI image build + S3 upload
     │   ├── prepare_aarch64_node/      # ARM node preparation
-    │   ├── cleanup_build_artifacts/   # Full cleanup
-    │   └── generate_functional_groups/ # Mode C only (commented out)
-    ├── playbooks/               # Sub-playbooks (prepare, build, cleanup, etc.)
+    │   └── cleanup_build_artifacts/   # Full cleanup
+    ├── playbooks/               # Sub-playbooks (prepare, build, cleanup)
     ├── library/                 # Custom Ansible modules
-    ├── callback_plugins/        # Output callback
-    ├── samples/                 # Sample files (repo_status.yml, build_status.yml)
+    ├── module_utils/            # Shared Python module utilities
+    ├── callback_plugins/        # Output callback (omnia_default.py)
     ├── vars/                    # Shared variables
-    ├── input/
-    │   └── project_default/
-    │       ├── image_build_config.yml        # Build config (edit this)
-    │       └── repo_manager_output/          # Repo manager outputs
-    │           ├── repo_status.yml           # RPM repo URLs + OS metadata
-    │           ├── functional_group_packages.yml  # Package mapping (edit this)
-    │           └── certs/                    # Pulp TLS certificates
-    ├── output/                  # Build output (auto-created)
-    └── containers/
-        ├── build_images.sh      # Build script for image containers
-        ├── image_builder/       # OpenCHAMI image builder container (ochami)
-        └── image_build_runner/  # Domain runner container (sshd, long-running)
-            ├── Containerfile    # Wolfi-based, Python 3.13, SSH port 2230
-            └── entrypoint.sh    # Starts sshd + keeps container alive
+    └── input/
+        └── project_default/
+            └── image_build_config.yml  # Build config (edit this)
+```
+
+### Runtime Output (auto-created at `/opt/omnia/image_build_manager/`)
+
+```
+/opt/omnia/image_build_manager/
+├── output/project_default/      # build_status.yml, versioned copies
+├── log/project_default/         # Base/compute image build logs
+├── log/image_build_manager.log  # Ansible playbook log
+├── s3/                          # MinIO S3 data
+├── registry/                    # Local container registry storage
+├── oci/                         # OCI image data
+└── workdir/                     # OpenCHAMI image build workdir
 ```
 
 ## License

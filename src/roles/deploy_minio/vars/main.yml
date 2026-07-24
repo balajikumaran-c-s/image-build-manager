@@ -13,13 +13,13 @@
 # limitations under the License.
 ---
 # OIM metadata (loaded on localhost via include_input_dir with omnia_metadata_support)
-oim_shared_path: "{{ hostvars['localhost']['oim_shared_path'] }}"
-oim_node_name: "{{ hostvars['localhost']['oim_node_name'] | default(ansible_hostname) }}"
+shared_path: "{{ hostvars['localhost']['shared_path'] }}"
+host_name: "{{ hostvars['localhost']['host_name'] | default(ansible_hostname) }}"
 domain_name: "{{ hostvars['localhost']['domain_name'] | default(ansible_domain) }}"
 admin_nic_ip: "{{ hostvars['localhost']['admin_nic_ip'] | default(ansible_default_ipv4.address) }}"
 
 # Derived cluster variables (same as prepare_oim/deploy_openchami)
-cluster_name: "{{ oim_node_name }}"
+cluster_name: "{{ host_name }}"
 cluster_domain: "{{ domain_name }}"
 cluster_boot_ip: "{{ admin_nic_ip }}"
 
@@ -30,8 +30,8 @@ storage_backend: "{{ hostvars['localhost']['storage_backend'] | default('minio')
 s3_configurations: "{{ hostvars['localhost']['s3_configurations'] | default({}) }}"
 
 # Directory paths (image_build_manager domain-specific)
-data_s3_dir: "{{ oim_shared_path }}/omnia/image_build_manager/s3/data"
-s3_work_dir: "{{ oim_shared_path }}/omnia/image_build_manager/s3"
+data_s3_dir: "{{ shared_path }}/s3/data"
+s3_work_dir: "{{ shared_path }}/s3"
 
 # File permissions
 file_perm_rw: "0644"

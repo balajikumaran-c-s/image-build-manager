@@ -13,20 +13,11 @@
 # limitations under the License.
 ---
 
-# --- Mode C (Omnia) vars — NOT SUPPORTED. Kept for reference. ---
-# upgrade_lock_path: /opt/omnia/.data/upgrade_in_progress.lock
-# upgrade_in_progress_msg: >-
-#   Upgrade is not completed fully.
-# omnia_input_dir: /opt/omnia/input
-# omnia_output_dir: /opt/omnia/output
-# omnia_input_config_file: "{{ omnia_input_dir }}/default.yml"
-# omnia_metadata_file_path: "/opt/omnia/.data/oim_metadata.yml"
-# omnia_input_config_syntax_fail_msg: >-
-#   Unable to load the Omnia project configuration file at {{ omnia_input_config_file }}.
-#   Please ensure the file exists and has valid YAML syntax before re-running the playbook.
-project_dir_not_exist_fail_msg: >-
-  The project directory at {{ input_project_dir }} does not exist.
-  Please ensure the directory exists before re-running the playbook.
+# ============================================================================
+# image_build_setup — Role Variables
+# ============================================================================
+# All user-facing error messages are defined here (not inline in tasks).
+# See CODING_RULES.md for naming and message conventions.
 
 # --- Common vars (inlined from common/vars/common_vars.yml) ---
 clone_retry: "5"
@@ -41,12 +32,7 @@ file_permissions_400: "0400"
 job_retry: "240"
 job_delay: "30"
 
-# --- OIM group ---
-oim_host_port: "22"
-oim_host_group: "oim"
-
 # --- Tag validation ---
-# Supported tags for image_build_manager.yml
 supported_tags:
   - prepare
   - build
@@ -55,12 +41,10 @@ supported_tags:
   - upgrade
   - rollback
 
-# Tags that skip credential prompting
 skip_credential_tags:
   - cleanup
   - validate
 
-# Invalid tag combinations (mutually exclusive)
 invalid_tag_combinations:
   - [prepare, cleanup]
   - [build, cleanup]
@@ -72,22 +56,87 @@ invalid_tag_combinations:
   - [cleanup, rollback]
   - [upgrade, rollback]
 
-# Tag validation messages
+# --- Tag validation messages ---
 tag_validation_fail_msg: |
   Invalid tag usage detected.
-  
   Supported tags: {{ supported_tags | join(', ') }}
-  
   Invalid tags provided: {{ invalid_tags | join(', ') }}
-  
   Please use only supported tags.
 
 tag_combination_fail_msg: |
   Invalid tag combination detected: {{ ansible_run_tags | join(', ') }}
-  
   The following tag combinations are not allowed:
   {% for combo in invalid_tag_combinations %}
   - {{ combo | join(' + ') }}
   {% endfor %}
-  
   Please run with only ONE tag at a time (or no tags for default flow).
+
+# --- Config validation messages ---
+config_missing_fail_msg: >-
+  config.yml not found at {{ playbook_dir }}/../config.yml.
+  Copy config.yml.sample to config.yml and edit for your environment.
+
+config_validation_fail_msg: >-
+  config.yml is missing required fields.
+  Required: project_name, host.hostname, host.admin_nic_ip, host.shared_path, host.domain_name
+
+host_hostname_fail_msg: >-
+  host.hostname must be a non-empty string containing only alphanumeric characters and hyphens.
+  Current value: '{{ standalone_config.host.hostname | default("") }}'
+
+host_admin_nic_ip_fail_msg: >-
+  host.admin_nic_ip must be a valid IPv4 address (e.g. 10.20.0.1).
+  Current value: '{{ standalone_config.host.admin_nic_ip | default("") }}'
+
+host_shared_path_fail_msg: >-
+  host.shared_path must be an absolute path starting with /.
+  Current value: '{{ standalone_config.host.shared_path | default("") }}'
+
+host_domain_name_fail_msg: >-
+  host.domain_name must be a non-empty string.
+  Current value: '{{ standalone_config.host.domain_name | default("") }}'
+
+# --- Prerequisite validation messages ---
+project_dir_not_exist_fail_msg: >-
+  The project directory at {{ input_project_dir }} does not exist.
+  Please ensure the directory exists before re-running the playbook.
+
+repo_manager_output_dir_fail_msg: >-
+  repo_manager output directory not found at {{ repo_manager_output_dir }}.
+  Create the directory and copy repo_status.yml + functional_group_packages.yml:
+    mkdir -p {{ repo_manager_output_dir }}
+    cp /opt/omnia/repo_manager/output/{{ project_name }}/repo_status.yml {{ repo_manager_output_dir }}/
+    cp <source>/functional_group_packages.yml {{ repo_manager_output_dir }}/
+
+repo_status_not_found_fail_msg: >-
+  repo_status.yml not found at {{ repo_manager_output_dir }}/repo_status.yml.
+  Copy repo_status.yml from your repo_manager output into {{ repo_manager_output_dir }}/.
+
+functional_group_packages_not_found_fail_msg: >-
+  functional_group_packages.yml not found at {{ repo_manager_output_dir }}/functional_group_packages.yml.
+  This file defines the RPM packages for each functional group.
+  Copy or create it in {{ repo_manager_output_dir }}/.
+
+pulp_cert_not_found_fail_msg: >-
+  Pulp certificate not found at {{ _pulp_cert_path | default('unknown') }}.
+  Ensure repo_manager has been run and the certificate exists on this host.
+
+repo_status_missing_section_fail_msg: >-
+  repo_status.yml is missing required 'repo_manager' section.
+  Ensure repo_manager.certificates.server_crt and repo_manager.port
+  are present in {{ repo_manager_output_dir }}/repo_status.yml.
+
+image_build_config_not_found_fail_msg: >-
+  image_build_config.yml not found at {{ input_project_dir }}/image_build_config.yml.
+  This file is required. See docs/contracts/input-contract.md for the expected format.
+
+# --- Mode C (Omnia) vars — NOT SUPPORTED. Kept for reference. ---
+# upgrade_lock_path: /opt/omnia/.data/upgrade_in_progress.lock
+# upgrade_in_progress_msg: >-
+#   Upgrade is not completed fully.
+# omnia_input_dir: /opt/omnia/input
+# omnia_output_dir: /opt/omnia/output
+# omnia_input_config_file: "{{ omnia_input_dir }}/default.yml"
+# omnia_metadata_file_path: "/opt/omnia/.data/oim_metadata.yml"
+# oim_host_port: "22"
+# oim_host_group: "oim"

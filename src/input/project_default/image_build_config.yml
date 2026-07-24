@@ -34,28 +34,16 @@ s3_configurations:
 # ---------------------------------------------------------------------------
 # Repo Manager Output (upstream dependency)
 # ---------------------------------------------------------------------------
-# Directory containing repo_status.yml and certs/ from repo_manager.
-# Copy the repo_manager output (repo_status.yml + certs/) into this directory.
+# Directory containing repo_manager output files for this project.
+# The playbook looks for these files inside this directory:
+#   repo_status.yml               — RPM repo URLs, OS metadata, cert paths
+#   functional_group_packages.yml — functional group → RPM package mapping
 #
-# Relative paths are resolved against the project directory:
-#   e.g. "repo_manager_output" → src/input/project_default/repo_manager_output/
+# Convention: /opt/omnia/repo_manager/output/<project_name>/
 #
-# Expected layout inside this directory:
-#   repo_manager_output/
-#   ├── repo_status.yml
-#   └── certs/
-#       ├── pulp_webserver.crt    ← REQUIRED for Pulp TLS
-#       └── pulp_webserver.key
-#
-# Certificate handling:
-#   - Certs are validated at startup and staged to shared_path/omnia/certs/
-#   - This staged copy is used by all build tasks (works in both Mode A & B)
-#   - If the cert is missing, the playbook fails with a clear error message
-#
-# Quick setup:
-#   scp <repo_manager_host>:/opt/omnia/output/repo_manager/certs/* \
-#       src/input/project_default/repo_manager_output/certs/
-repo_manager_output_path: "repo_manager_output"
+# Certificate paths in repo_status.yml are absolute and read directly:
+#   repo_manager.certificates.server_crt: /opt/omnia/pulp/settings/certs/pulp_webserver.crt
+repo_manager_output_dir: "/opt/omnia/repo_manager/output/project_default"
 
 # ---------------------------------------------------------------------------
 # ARM Build Host (aarch64)
@@ -78,7 +66,7 @@ aarch64_ssh_user: "root"
 # the target architecture suffix (_x86_64 or _aarch64).
 #
 # The RPM packages for each group are defined in:
-#   repo_manager_output/functional_group_packages.yml
+#   <repo_manager_output_dir>/functional_group_packages.yml
 # Edit that file to add/remove packages per functional group.
 #
 # Valid functional group names (from FUNCTIONAL_GROUP_LAYER_MAP):

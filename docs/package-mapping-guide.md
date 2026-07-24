@@ -3,8 +3,7 @@
 ## Overview
 
 The `functional_group_packages.yml` file defines which RPM packages are installed
-in each OS image variant. It is the **single source of truth** for package resolution
-in standalone mode (Mode A and Mode B).
+in each OS image variant. It is the **single source of truth** for package resolution.
 
 **Location**: `src/input/project_default/repo_manager_output/functional_group_packages.yml`
 

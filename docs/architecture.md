@@ -4,26 +4,39 @@
 
 ```
                     ┌─────────────────────────────────────────────┐
-                    │           Image Build Manager                │
+                    │      Image Build Manager (Mode A)            │
                     │                                             │
   ┌──────────┐      │  ┌────────────┐  ┌────────────┐  ┌────────┐│      ┌──────────┐
-  │ User     │─────▶│  │ Validate   │─▶│ Prepare    │─▶│ Build  ││─────▶│ S3 / OCI │
-  │ config   │      │  │ (schema +  │  │ (MinIO +   │  │ (base +││      │ Artifacts│
-  │ files    │      │  │  runtime)  │  │  registry) │  │ compute││      │          │
-  └──────────┘      │  └────────────┘  └────────────┘  └────────┘│      └──────────┘
-                    └─────────────────────────────────────────────┘
+  │ config   │─────▶│  │ Validate   │─▶│ Prepare    │─▶│ Build  ││─────▶│ S3 / OCI │
+  │  .yml    │      │  │ (schema +  │  │ (MinIO +   │  │ (base +││      │ Artifacts│
+  │ + repo   │      │  │  runtime)  │  │  registry) │  │ compute││      │          │
+  │ _status  │      │  └────────────┘  └────────────┘  └────────┘│      └──────────┘
+  └──────────┘      └─────────────────────────────────────────────┘
 ```
+
+## Execution Mode
+
+**Mode A (bare-metal)** — the only supported execution mode. The playbook runs
+directly on the RHEL host via `ansible-playbook`. All tasks execute locally
+(`connection: local`) except aarch64 builds which SSH to an ARM node.
+
+> Mode B (container) and Mode C (Omnia mono-repo) are commented out in the codebase.
 
 ## Execution Flow
 
-### 1. Setup (`image_build_manager.yml` — tag: always)
+### 1. Setup (`image_build_setup` role — tag: always)
 
-- Detect execution mode (standalone or omnia)
-- Load `config.yml` → set `input_project_dir`, `output_project_dir`, `oim_shared_path`
-- Load `image_build_config.yml` → S3 config, functional groups, build settings
-- Load `repo_status.yml` → RPM repo URLs, OS metadata, Pulp certificates
-- Create `oim` host group (local for Mode A, SSH for Mode B)
-- Validate tag usage (supported_tags, invalid_tag_combinations)
+- Validate tags and tag combinations
+- Load and validate `config.yml` — hostname regex, IPv4, absolute path checks
+- Set project dirs, host vars
+- Validate all prerequisite files exist (fail-fast):
+  - `image_build_config.yml`
+  - `repo_manager_output_path` directory
+  - `repo_status.yml` inside it
+  - `functional_group_packages.yml` inside it
+- Load `repo_status.yml` → RPM repo URLs, cert paths
+- Validate Pulp certificate exists at absolute path
+- Build repo lists, set pulp facts, s3_endpoint
 
 ### 2. Validate (`--tags validate`)
 
@@ -78,13 +91,12 @@ cleanup_build_artifacts
 
 ### Inputs
 
-| File | Purpose |
-|------|---------|
-| `config.yml` | Project + build host settings |
-| `image_build_config.yml` | S3, functional groups, build params |
-| `repo_status.yml` | RPM repo URLs + OS metadata |
-| `functional_group_packages.yml` | Functional group → RPM package mapping |
-| Pulp certs | TLS certificates for RPM repo access |
+| File | Source | Purpose |
+|------|--------|---------|
+| `config.yml` | User-created (repo root) | Host + project settings |
+| `image_build_config.yml` | `src/input/project_default/` | S3, functional groups, build params |
+| `repo_status.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | RPM repo URLs + OS metadata + cert paths |
+| `functional_group_packages.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | Functional group → RPM package mapping |
 
 ### Outputs
 
@@ -93,11 +105,20 @@ cleanup_build_artifacts
 | `build_status.yml` | S3 artifact paths per functional group |
 | Validation logs | `output/<project>/log/image_build_validation_*.log` |
 
+## Key Paths
+
+| Path | Purpose |
+|------|---------|
+| `/opt/omnia/image_build_manager/` | Shared path — MinIO data, registry, workdir, logs |
+| `/opt/omnia/repo_manager/output/<project_name>/` | Upstream repo_manager output directory |
+| `/opt/omnia/pulp/settings/certs/pulp_webserver.crt` | Pulp TLS certificate (read as-is) |
+
 ## Key Design Decisions
 
 1. **No `software_config.json`** — replaced by `functional_group_packages.yml`
-2. **No `/opt/omnia` paths** — all paths derived from `config.yml`
-3. **No `omnia_core` container** — runs on bare-metal or domain container
-4. **Mode C code commented out** — kept for historical reference only
+2. **Mode A only** — bare-metal execution, no container or Omnia core required
+3. **Absolute cert paths** — read directly from `repo_status.yml`, no staging
+4. **Config uses `host`** — generic key name (not `build_host`), works for all repos
 5. **Single mapping file** — `functional_group_packages.yml` is the single source
    of truth for which RPMs go into each image variant
+6. **Mode B/C commented out** — kept in codebase for historical reference
