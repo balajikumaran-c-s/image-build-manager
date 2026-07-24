@@ -60,7 +60,7 @@
 - name: Validate host.admin_nic_ip is a valid IPv4 address
   ansible.builtin.assert:
     that:
-      - standalone_config.host.admin_nic_ip | ansible.utils.ipv4
+      - standalone_config.host.admin_nic_ip | ansible.utils.ipaddr('ipv4')
     fail_msg: "{{ host_admin_nic_ip_fail_msg }}"
     quiet: true
 
