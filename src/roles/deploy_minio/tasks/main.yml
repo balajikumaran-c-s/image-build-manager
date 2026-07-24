@@ -16,6 +16,12 @@
 # Extracted from prepare_oim/roles/deploy_containers/openchami/tasks/configs/minio.yml
 # Skipped when s3_configurations.provider == 'powerscale' (external S3).
 
+- name: Set S3 credentials from loaded image_build_credentials.yml
+  ansible.builtin.set_fact:
+    s3_access_id: "{{ hostvars['localhost']['s3_access_id'] | default('admin') }}"
+    s3_secret_key: "{{ hostvars['localhost']['s3_secret_key'] | default('') }}"
+  no_log: true
+
 - name: Skip MinIO deployment for PowerScale provider
   ansible.builtin.debug:
     msg: "S3 provider is '{{ s3_configurations.provider | default('minio') }}' — skipping MinIO deployment. Using external PowerScale S3 endpoint."
