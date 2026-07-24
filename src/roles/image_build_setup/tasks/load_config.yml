@@ -52,6 +52,7 @@
     admin_nic_ip: "{{ standalone_config.host.admin_nic_ip }}"
     shared_path: "{{ standalone_config.host.shared_path }}"
     host_name: "{{ standalone_config.host.hostname }}"
+    oim_node_name: "{{ standalone_config.host.hostname.split('.')[0] }}"
     domain_name: "{{ standalone_config.host.domain_name }}"
     functional_groups_config_path: "{{ standalone_config.host.shared_path }}/output/{{ standalone_config.project_name }}/.data/functional_groups_config.yml"
     standalone_mode: true
