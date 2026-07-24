@@ -33,7 +33,7 @@
             "minLength": 1,
             "maxLength": 64
         },
-        "repo_manager_output_path": {
+        "repo_manager_output_dir": {
             "type": "string",
             "description": "Path to repo_manager output file (repo_status.yml). Default: {{ output_project_dir }}/repo_manager/repo_status.yml"
         },

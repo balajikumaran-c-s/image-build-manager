@@ -20,7 +20,7 @@ This document defines all input files consumed by the `image_build_manager` doma
 |-------|------|----------|---------|-------------|
 | `s3_configurations.provider` | string | Yes | `"minio"` | S3 backend: `minio` (deployed locally) or `powerscale` (external) |
 | `s3_configurations.endpoint_url` | string | No | `""` | S3 endpoint URL; auto-detected for MinIO, required for PowerScale |
-| `repo_manager_output_path` | string | No | `""` | Path to `repo_status.yml`; empty = default location |
+| `repo_manager_output_dir` | string | No | `""` | Path to `repo_status.yml`; empty = default location |
 | `aarch64_inventory_host_ip` | string | No | `""` | ARM build host IP; empty = skip aarch64 builds |
 | `aarch64_ssh_user` | string | No | `"root"` | SSH user for ARM build host |
 | `build_image.job_async` | int | No | `7200` | Max async wait for image build (seconds) |
@@ -60,7 +60,7 @@ This document defines all input files consumed by the `image_build_manager` doma
 **Purpose**: Output from `repo_manager` domain consumed as input by `image_build_manager`.
 
 **Location**: `output/project_default/repo_manager/repo_status.yml`  
-(or custom path via `repo_manager_output_path` in `image_build_config.yml`)
+(or custom path via `repo_manager_output_dir` in `image_build_config.yml`)
 
 **Producer**: `repo_manager` domain
 

@@ -21,7 +21,7 @@
 - name: Set facts for aarch64 image templates vars
   ansible.builtin.set_fact:
     rhel_tag: "{{ hostvars['localhost']['rhel_tag'] }}"
-    oim_node_name: "{{ hostvars['localhost']['oim_node_name'] }}"
+    host_name: "{{ hostvars['localhost']['host_name'] }}"
     domain_name: "{{ hostvars['localhost']['domain_name'] }}"
     rhel_arch_repos: "{{ hostvars['localhost']['rhel_arch_repos'] }}"
     base_image_packages: "{{ hostvars['localhost']['base_image_packages'] }}"
@@ -29,7 +29,7 @@
 
 - name: Compute registry host (avoid doubled domain in FQDN)
   vars:
-    _node: "{{ oim_node_name }}"
+    _node: "{{ host_name }}"
     _domain: "{{ domain_name }}"
   ansible.builtin.set_fact:
     registry_host: "{{ _node if _node.endswith('.' + _domain) else _node + '.' + _domain }}"

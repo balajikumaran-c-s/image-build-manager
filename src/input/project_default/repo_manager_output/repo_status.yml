@@ -15,8 +15,8 @@
 # ============================================================================
 # SAMPLE: repo_status.yml — repo_manager output contract
 # ============================================================================
-# Location (NFS):
-#   /opt/omnia/output/repo_manager/repo_status.yml
+# Location:
+#   /opt/omnia/repo_manager/output/repo_status.yml
 #
 # Producer: repo_manager domain (repo_manager.yml)
 # Consumer: image_build_manager domain (image_build_manager.yml Step 4)
@@ -47,17 +47,9 @@ git_base_url: "https://{{ admin_nic_ip }}:2225/pulp/content/opt/omnia/offline_re
 repo_manager:
   port: 2225
   certificates:
-    # Cert paths: relative to this repo_manager_output/ directory, or absolute.
-    # During setup, certs are staged to shared_path/omnia/certs/ for cross-mode access.
-    #
-    # To set up certs:
-    #   1. Copy from your repo_manager host:
-    #      scp <repo_manager_host>:/opt/omnia/output/repo_manager/certs/* \
-    #          src/input/project_default/repo_manager_output/certs/
-    #   2. Verify: ls src/input/project_default/repo_manager_output/certs/pulp_webserver.crt
-    server_crt: "certs/pulp_webserver.crt"
-    server_key: "certs/pulp_webserver.key"
-    certs_dir: "certs"
+    server_crt: /opt/omnia/pulp/settings/certs/pulp_webserver.crt
+    server_key: /opt/omnia/pulp/settings/certs/pulp_webserver.key
+    certs_dir: /opt/omnia/pulp/settings/certs
 
 # RPM Repository Base URLs
 rpm_repos:

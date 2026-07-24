@@ -92,8 +92,8 @@
 
     - name: Fail if aarch64 base osimage not created
       ansible.builtin.fail:
-        msg: "Failed to build base osimage {{ oim_node_name }}/{{ rhel_arch_base_image_name }}"
-      when: (oim_node_name + '/' + rhel_arch_base_image_name) not in verify_base_osimage.stdout_lines
+        msg: "Failed to build base osimage {{ host_name }}/{{ rhel_arch_base_image_name }}"
+      when: (host_name + '/' + rhel_arch_base_image_name) not in verify_base_osimage.stdout_lines
 
     - name: Verify aarch64 base osimage output
       ansible.builtin.debug:

@@ -61,18 +61,17 @@ correct host (the `oim` host group).
 
 ---
 
-### 5. Mode B — SSH connection refused
+### 5. Pulp certificate not found
 
-**Error** when running in container mode:
+**Error**:
 ```
-UNREACHABLE! => {"msg": "Failed to connect to the host via ssh"}
+Pulp certificate not found at /opt/omnia/pulp/settings/certs/pulp_webserver.crt.
+Ensure repo_manager has been run and the certificate exists on this host.
 ```
 
-**Fix**: In Mode B (container), the playbook SSHes back to the host via
-`admin_nic_ip`. Ensure:
-- `config.yml → build_host.admin_nic_ip` is set to the host IP
-- SSH is accessible on the host from inside the container
-- The container has network access to the host
+**Fix**: The playbook reads the cert path directly from `repo_status.yml`.
+Ensure `repo_manager` has been run and the certificate exists at the path
+specified in `repo_status.yml → repo_manager.certificates.server_crt`.
 
 ---
 

@@ -25,7 +25,7 @@
   block:
     - name: Load functional_group_packages.yml
       ansible.builtin.include_vars:
-        file: "{{ _resolved_repo_output }}/functional_group_packages.yml"
+        file: "{{ repo_manager_output_dir }}/functional_group_packages.yml"
         name: _fg_pkg_mapping
 
     - name: Set base_image_packages from mapping

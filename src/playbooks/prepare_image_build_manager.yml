@@ -43,8 +43,9 @@
         name: validate_image_build_input
       when: not (image_build_setup_done | default(false) | bool)
 
-- name: Deploy MinIO and Registry on OIM
-  hosts: oim
+- name: Deploy MinIO and Registry
+  hosts: localhost
+  connection: local
   gather_facts: true
   tasks:
     - name: Deploy MinIO S3 storage
@@ -60,48 +61,38 @@
         name: build_os_images
         tasks_from: preflight_selinux_check.yml
 
-    - name: Update omnia.target with image_build_manager services
-      when: not hostvars['localhost']['standalone_mode'] | default(false) | bool
-      block:
-        - name: Check if omnia.target exists
-          ansible.builtin.stat:
-            path: /etc/systemd/system/omnia.target
-          register: omnia_target_file
-
-        - name: Read existing omnia.target content
-          ansible.builtin.slurp:
-            src: /etc/systemd/system/omnia.target
-          register: omnia_target_content
-          when: omnia_target_file.stat.exists
-
-        - name: Parse existing Requires line
-          ansible.builtin.set_fact:
-            omnia_target_requires: "{{ (omnia_target_content.content | b64decode | regex_search('Requires=(.+)', '\\1'))[0] | default('') }}"
-          when: omnia_target_file.stat.exists
-
-        - name: Append registry.service to omnia.target if missing
-          ansible.builtin.replace:
-            path: /etc/systemd/system/omnia.target
-            regexp: '^(Requires=.*)$'
-            replace: '\1 registry.service'
-          when:
-            - omnia_target_file.stat.exists
-            - "'registry.service' not in omnia_target_requires"
-          notify: Reload systemd for omnia target
-
-        - name: Append minio.service to omnia.target if missing (minio provider only)
-          ansible.builtin.replace:
-            path: /etc/systemd/system/omnia.target
-            regexp: '^(Requires=.*)$'
-            replace: '\1 minio.service'
-          when:
-            - omnia_target_file.stat.exists
-            - "'minio.service' not in omnia_target_requires"
-            - hostvars['localhost']['s3_configurations']['provider'] | default('minio') != 'powerscale'
-          notify: Reload systemd for omnia target
-
-  handlers:
-    - name: Reload systemd for omnia target
-      ansible.builtin.systemd:
-        daemon_reload: true
-      listen: Reload systemd for omnia target
+    # --- omnia.target registration — Mode C only, NOT SUPPORTED ---
+    # In Mode A, services are managed directly via Podman Quadlet systemd units.
+    # The omnia.target block below is commented out. Kept for reference.
+    # - name: Update omnia.target with image_build_manager services
+    #   when: not hostvars['localhost']['standalone_mode'] | default(false) | bool
+    #   block:
+    #     - name: Check if omnia.target exists
+    #       ansible.builtin.stat:
+    #         path: /etc/systemd/system/omnia.target
+    #       register: omnia_target_file
+    #
+    #     - name: Read existing omnia.target content
+    #       ansible.builtin.slurp:
+    #         src: /etc/systemd/system/omnia.target
+    #       register: omnia_target_content
+    #       when: omnia_target_file.stat.exists
+    #
+    #     - name: Append registry.service to omnia.target if missing
+    #       ansible.builtin.replace:
+    #         path: /etc/systemd/system/omnia.target
+    #         regexp: '^(Requires=.*)$'
+    #         replace: '\1 registry.service'
+    #       when:
+    #         - omnia_target_file.stat.exists
+    #         - "'registry.service' not in omnia_target_requires"
+    #
+    #     - name: Append minio.service to omnia.target if missing
+    #       ansible.builtin.replace:
+    #         path: /etc/systemd/system/omnia.target
+    #         regexp: '^(Requires=.*)$'
+    #         replace: '\1 minio.service'
+    #       when:
+    #         - omnia_target_file.stat.exists
+    #         - "'minio.service' not in omnia_target_requires"
+    #         - hostvars['localhost']['s3_configurations']['provider'] | default('minio') != 'powerscale'

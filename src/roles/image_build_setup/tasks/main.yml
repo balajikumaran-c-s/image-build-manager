@@ -13,237 +13,49 @@
 # limitations under the License.
 ---
 # image_build_setup — Self-contained setup for image_build_manager.
-# Replaces: upgrade_checkup.yml + include_input_dir.yml + create_container_group.yml
 #
-# What it does:
-#   0. Validate tags and tag combinations
-#   1. Guard: block if upgrade is in progress
-#   2. Load omnia project config (input/output dirs)
-#   3. Load OIM metadata
-#   4. Create oim inventory group
-#   5. Set image_build_main_flow and skip_subscription_check facts
+# Task files:
+#   validate_tags.yml      — Step 1: Validate tags and tag combinations
+#   load_config.yml        — Step 2-3: Load config.yml, validate host, set dirs
+#   validate_prereqs.yml   — Step 4: Validate all prerequisite files (fail-fast)
+#   load_repo_status.yml   — Step 5-6: Load repo_status.yml, build repo lists
+#   main.yml (this file)   — Step 7: Set guard facts
 
-# --- Step 0: Tag validation ---
-- name: Get provided tags (excluding 'always' and 'all')
-  ansible.builtin.set_fact:
-    provided_tags: "{{ ansible_run_tags | difference(['always', 'all']) }}"
+- name: Include tag validation
+  ansible.builtin.include_tasks: validate_tags.yml
 
-- name: Identify invalid tags
-  ansible.builtin.set_fact:
-    invalid_tags: "{{ provided_tags | difference(supported_tags) }}"
-  when: provided_tags | length > 0
+- name: Include config loading and host validation
+  ansible.builtin.include_tasks: load_config.yml
 
-- name: Fail if invalid tags are provided
-  ansible.builtin.fail:
-    msg: "{{ tag_validation_fail_msg }}"
-  when:
-    - provided_tags | length > 0
-    - invalid_tags | default([]) | length > 0
+- name: Include prerequisite file validation
+  ansible.builtin.include_tasks: validate_prereqs.yml
+  when: "'cleanup' not in (provided_tags | default([]))"
 
-- name: Check for invalid tag combinations
-  ansible.builtin.set_fact:
-    has_invalid_combination: true
-  when:
-    - provided_tags | length > 1
-    - item | difference(provided_tags) | length == 0
-  loop: "{{ invalid_tag_combinations }}"
+- name: Include repo_status loading and repo list building
+  ansible.builtin.include_tasks: load_repo_status.yml
+  when: "'cleanup' not in (provided_tags | default([]))"
 
-- name: Fail if invalid tag combination is detected
-  ansible.builtin.fail:
-    msg: "{{ tag_combination_fail_msg }}"
-  when: has_invalid_combination | default(false) | bool
+# =========================================================================
+# Step 7: Set guard facts
+# =========================================================================
+- name: Display loaded configuration
+  ansible.builtin.debug:
+    msg:
+      - "Project: {{ project_name }}"
+      - "Host: {{ host_name }}.{{ domain_name }} ({{ admin_nic_ip }})"
+      - "Shared path: {{ shared_path }}"
+      - "Output dir: {{ output_project_dir }}"
+      - "Log dir: {{ log_dir }}"
+      - "Repo manager output: {{ repo_manager_output_dir | default('(skipped for cleanup)') }}"
+      - "Pulp cert: {{ pulp_cert_path | default('(skipped for cleanup)') }}"
+      - "x86_64 repos: {{ repo_manager_repos_x86_64 | default([]) | length }}"
+      - "aarch64 repos: {{ repo_manager_repos_aarch64 | default([]) | length }}"
+    verbosity: 1
 
-- name: Set skip_credentials flag for cleanup/validate tags
-  ansible.builtin.set_fact:
-    skip_build_credentials: true
-    cacheable: true
-  when:
-    - provided_tags | length > 0
-    - (provided_tags | intersect(skip_credential_tags)) | length > 0
-
-# --- Step 0.5: Detect execution mode ---
-# Standalone mode is true when config.yml exists at playbook_dir/../config.yml.
-# In Omnia mode, playbooks live under /omnia/src/ and no config.yml exists there.
-# NOTE: Do NOT check 'omnia_input_dir is defined' — it's always defined in vars/main.yml.
-- name: Check for standalone config.yml
-  ansible.builtin.stat:
-    path: "{{ playbook_dir }}/../config.yml"
-  register: _standalone_config_file
-
-- name: Detect standalone mode
-  ansible.builtin.set_fact:
-    standalone_mode: "{{ standalone_mode | default(false) | bool or _standalone_config_file.stat.exists }}"
-    cacheable: true
-
-# --- Step 1: Upgrade guard (Omnia mode only) ---
-- name: Check upgrade lock file
-  ansible.builtin.stat:
-    path: "{{ upgrade_lock_path }}"
-  register: upgrade_lock
-  when: not standalone_mode | bool
-
-- name: Block playbook while upgrade is in progress
-  ansible.builtin.fail:
-    msg: "{{ upgrade_in_progress_msg }}"
-  when:
-    - not standalone_mode | bool
-    - upgrade_lock.stat.exists | default(false)
-    - not (upgrade_mode | default(false) | bool)
-
-# --- Step 2a: Load omnia project config (Omnia mode — NOT SUPPORTED, guarded by standalone_mode) ---
-- name: Load omnia project config file
-  when: not standalone_mode | bool
-  block:
-    - name: Include omnia project config file
-      ansible.builtin.include_vars: "{{ omnia_input_config_file }}"
-      register: include_omnia_config
-  rescue:
-    - name: Failed to include omnia project config file
-      ansible.builtin.fail:
-        msg: "{{ omnia_input_config_syntax_fail_msg }} Error: {{ include_omnia_config.message }}"
-
-- name: Set input_project_dir and output_project_dir (Omnia mode)
-  ansible.builtin.set_fact:
-    input_project_dir: "{{ omnia_input_dir }}/{{ project_name }}"
-    output_project_dir: "{{ omnia_output_dir }}/{{ project_name }}"
-    cacheable: true
-  when: not standalone_mode | bool
-
-# --- Step 2b: Load standalone config ---
-- name: Load standalone config
-  when:
-    - standalone_mode | bool
-    - _standalone_src_dir is not defined
-  block:
-    - name: Include standalone config.yml
-      ansible.builtin.include_vars:
-        file: "{{ playbook_dir }}/../config.yml"
-        name: standalone_config
-
-    - name: Validate standalone config.yml
-      ansible.builtin.assert:
-        that:
-          - standalone_config.project_name is defined
-          - standalone_config.project_name | length > 0
-          - standalone_config.build_host is defined
-          - standalone_config.build_host.admin_nic_ip is defined
-          - standalone_config.build_host.shared_path is defined
-          - standalone_config.build_host.domain_name is defined
-        fail_msg: >-
-          config.yml is missing required fields.
-          Required: project_name, build_host.admin_nic_ip, build_host.shared_path, build_host.domain_name
-        quiet: true
-
-    - name: Set project dirs from standalone config (derived from playbook_dir)
-      ansible.builtin.set_fact:
-        input_project_dir: "{{ playbook_dir }}/input/{{ standalone_config.project_name }}"
-        output_project_dir: "{{ playbook_dir }}/output/{{ standalone_config.project_name }}"
-        project_name: "{{ standalone_config.project_name }}"
-        admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
-        functional_groups_config_path: "{{ playbook_dir }}/output/{{ standalone_config.project_name }}/.data/functional_groups_config.yml"
-        _standalone_src_dir: "{{ playbook_dir }}"
-        cacheable: true
-
-- name: Verify the project directory exists
-  ansible.builtin.stat:
-    path: "{{ input_project_dir }}"
-  register: verify_project_dir
-
-- name: Fail if project directory does not exist
-  ansible.builtin.fail:
-    msg: "{{ project_dir_not_exist_fail_msg }}"
-  when: not verify_project_dir.stat
-
-- name: Ensure output project directory exists
-  ansible.builtin.file:
-    path: "{{ output_project_dir }}"
-    state: directory
-    mode: '0755'
-
-- name: Ensure log directory exists
-  ansible.builtin.file:
-    path: "{{ playbook_dir }}/log"
-    state: directory
-    mode: '0755'
-
-# --- Step 2b: Create cert staging directory in shared_path ---
-- name: Ensure cert staging directory exists
-  ansible.builtin.file:
-    path: "{{ standalone_config.build_host.shared_path }}/omnia/certs"
-    state: directory
-    mode: '0755'
-  become: true
-  when: standalone_mode | bool
-
-# --- Step 3a: Load OIM metadata (Omnia mode — NOT SUPPORTED, guarded by standalone_mode) ---
-- name: Include oim metadata vars
-  ansible.builtin.include_vars: "{{ omnia_metadata_file_path }}"
-  when: not standalone_mode | bool
-
-# --- Step 3b: Set build host vars (standalone mode) ---
-- name: Set build host vars from standalone config
-  when:
-    - standalone_mode | bool
-    - not (image_build_setup_done | default(false) | bool)
-  ansible.builtin.set_fact:
-    oim_shared_path: "{{ standalone_config.build_host.shared_path }}"
-    oim_node_name: "{{ standalone_config.build_host.hostname | default('localhost') }}"
-    domain_name: "{{ standalone_config.build_host.domain_name }}"
-    admin_nic_ip: "{{ standalone_config.build_host.admin_nic_ip }}"
-    cacheable: true
-
-# --- Step 4: Create oim inventory group ---
-# Omnia mode (Mode C) — NOT SUPPORTED. Kept for reference.
-- name: Create {{ oim_host_group }} group (Omnia mode) # noqa: name[template]
-  ansible.builtin.add_host:
-    hostname: "{{ oim_host_group }}"
-    ansible_host: "localhost"
-    ansible_port: "{{ oim_host_port }}"
-    groups: "{{ oim_host_group }}"
-  when: not standalone_mode | bool
-
-# --- Standalone: detect if running inside a container (Mode B) ---
-- name: Check if running inside a container (Mode B detection)
-  ansible.builtin.stat:
-    path: /run/.containerenv
-  register: _containerenv_check
-  when: standalone_mode | bool
-
-- name: Set container mode fact
-  ansible.builtin.set_fact:
-    _running_in_container: "{{ _containerenv_check.stat.exists | default(false) }}"
-    cacheable: true
-  when: standalone_mode | bool
-
-# Mode A (bare-metal): run tasks locally
-- name: Create {{ oim_host_group }} group (standalone — bare-metal) # noqa: name[template]
-  ansible.builtin.add_host:
-    hostname: "{{ oim_host_group }}"
-    ansible_host: "localhost"
-    ansible_connection: "local"
-    groups: "{{ oim_host_group }}"
-  when:
-    - standalone_mode | bool
-    - not (_running_in_container | default(false) | bool)
-
-# Mode B (container): SSH to the host
-- name: Create {{ oim_host_group }} group (standalone — container, SSH to host) # noqa: name[template]
-  ansible.builtin.add_host:
-    hostname: "{{ oim_host_group }}"
-    ansible_host: "{{ admin_nic_ip }}"
-    ansible_connection: "ssh"
-    ansible_user: "root"
-    groups: "{{ oim_host_group }}"
-  when:
-    - standalone_mode | bool
-    - _running_in_container | default(false) | bool
-
-# --- Step 5: Set image build guard facts ---
 - name: Set image_build_manager guard facts
   ansible.builtin.set_fact:
     image_build_main_flow: true
     skip_subscription_check: true
-    standalone_mode: "{{ standalone_mode }}"
-    omnia_run_tags: "{{ omnia_run_tags | default(['image_build_manager']) }}"
+    standalone_mode: true
     image_build_setup_done: true
     cacheable: true

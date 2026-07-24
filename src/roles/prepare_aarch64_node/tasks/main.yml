@@ -100,7 +100,7 @@
     nfs_info:
       server_ip: "{{ hostvars['localhost']['nfs_server_ip'] }}"
       server_share_path: "{{ hostvars['localhost']['nfs_server_share_path'] }}"
-      shared_path: "{{ hostvars['localhost']['oim_shared_path'] }}"
+      shared_path: "{{ hostvars['localhost']['shared_path'] }}"
 
 - name: Ensure NFS mount point directory exists
   ansible.builtin.file:
