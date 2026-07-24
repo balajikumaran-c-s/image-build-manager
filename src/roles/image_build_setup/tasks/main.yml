@@ -46,8 +46,8 @@
       - "Shared path: {{ shared_path }}"
       - "Output dir: {{ output_project_dir }}"
       - "Log dir: {{ log_dir }}"
-      - "Repo manager output: {{ repo_manager_output_dir }}"
-      - "Pulp cert: {{ pulp_cert_path }}"
+      - "Repo manager output: {{ repo_manager_output_dir | default('(skipped for cleanup)') }}"
+      - "Pulp cert: {{ pulp_cert_path | default('(skipped for cleanup)') }}"
       - "x86_64 repos: {{ repo_manager_repos_x86_64 | default([]) | length }}"
       - "aarch64 repos: {{ repo_manager_repos_aarch64 | default([]) | length }}"
     verbosity: 1
