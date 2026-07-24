@@ -81,7 +81,7 @@ ansible-playbook image_build_manager.yml --tags cleanup    # Remove everything
 
 | File | Location | Required | Description |
 |------|----------|----------|-------------|
-| `config.yml` | Repo root | Yes | Host + project settings |
+| `config.yml` | Repo root | Yes | Host + project settings (validated against JSON Schema in `src/library/module_utils/image_build_validation/schema/`) |
 | `image_build_config.yml` | `src/input/project_default/` | Yes | S3 config, functional groups, build settings |
 | `repo_status.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | Yes | RPM repo URLs + OS metadata + cert paths |
 | `functional_group_packages.yml` | `/opt/omnia/repo_manager/output/<project_name>/` | Yes | **Functional group → RPM package mapping** |

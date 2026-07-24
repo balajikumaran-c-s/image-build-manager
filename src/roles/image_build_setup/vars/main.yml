@@ -76,25 +76,6 @@ config_missing_fail_msg: >-
   config.yml not found at {{ playbook_dir }}/../config.yml.
   Copy config.yml.sample to config.yml and edit for your environment.
 
-config_validation_fail_msg: >-
-  config.yml is missing required fields.
-  Required: project_name, host.hostname, host.admin_nic_ip, host.shared_path, host.domain_name
-
-host_hostname_fail_msg: >-
-  host.hostname must be a non-empty string containing only alphanumeric characters and hyphens.
-  Current value: '{{ standalone_config.host.hostname | default("") }}'
-
-host_admin_nic_ip_fail_msg: >-
-  host.admin_nic_ip must be a valid IPv4 address (e.g. 10.20.0.1).
-  Current value: '{{ standalone_config.host.admin_nic_ip | default("") }}'
-
-host_shared_path_fail_msg: >-
-  host.shared_path must be an absolute path starting with /.
-  Current value: '{{ standalone_config.host.shared_path | default("") }}'
-
-host_domain_name_fail_msg: >-
-  host.domain_name must be a non-empty string.
-  Current value: '{{ standalone_config.host.domain_name | default("") }}'
 
 # --- Prerequisite validation messages ---
 project_dir_not_exist_fail_msg: >-
