@@ -45,8 +45,8 @@ minio_release_tag: "latest"
 # S3 credentials from image_build_credentials.yml (loaded on localhost)
 # s3_access_id defaults to 'admin' for MinIO (only prompted for PowerScale)
 # s3_secret_key is always mandatory (always prompted)
-s3_access_id: "{{ hostvars['localhost']['image_build_creds'].get('s3_access_id', 'admin') }}"
-s3_secret_key: "{{ hostvars['localhost']['image_build_creds']['s3_secret_key'] }}"
+s3_access_id: "{{ hostvars['localhost']['image_build_creds']['s3_access_id'] | default('admin') }}"
+s3_secret_key: "{{ hostvars['localhost']['image_build_creds']['s3_secret_key'] | default('') }}"
 
 # Validation messages
 s3_secret_key_empty_fail_msg: >-
