@@ -84,10 +84,10 @@ project_dir_not_exist_fail_msg: >-
 
 repo_manager_output_dir_fail_msg: >-
   repo_manager output directory not found at {{ repo_manager_output_dir }}.
-  Create the directory and copy repo_status.yml + functional_group_packages.yml:
+  Create the directory and copy the required files:
     mkdir -p {{ repo_manager_output_dir }}
-    cp /opt/omnia/repo_manager/output/{{ project_name }}/repo_status.yml {{ repo_manager_output_dir }}/
-    cp <source>/functional_group_packages.yml {{ repo_manager_output_dir }}/
+    cp src/input/{{ project_name }}/repo_manager_output/repo_status.yml {{ repo_manager_output_dir }}/
+    cp src/input/{{ project_name }}/repo_manager_output/functional_group_packages.yml {{ repo_manager_output_dir }}/
 
 repo_status_not_found_fail_msg: >-
   repo_status.yml not found at {{ repo_manager_output_dir }}/repo_status.yml.

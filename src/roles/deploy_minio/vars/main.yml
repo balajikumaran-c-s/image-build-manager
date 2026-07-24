@@ -43,11 +43,16 @@ minio_image: "quay.io/minio/minio:latest"
 minio_release_tag: "latest"
 
 # S3 credentials from image_build_credentials.yml (loaded on localhost)
-# For minio: access_id defaults to 'admin' if not provided in credentials
-s3_access_id: "{{ hostvars['localhost']['image_build_creds']['s3_access_id'] | default(hostvars['localhost']['s3_access_id'], true) | default('admin', true) }}"
-s3_secret_key: "{{ hostvars['localhost']['image_build_creds']['s3_secret_key'] | default(hostvars['localhost']['s3_secret_key'], true) | default('') }}"
-minio_access_key: "{{ s3_access_id }}"
-minio_secret_key: "{{ s3_secret_key }}"
+# s3_access_id defaults to 'admin' for MinIO (only prompted for PowerScale)
+# s3_secret_key is always mandatory (always prompted)
+s3_access_id: "{{ hostvars['localhost']['image_build_creds'].get('s3_access_id', 'admin') }}"
+s3_secret_key: "{{ hostvars['localhost']['image_build_creds']['s3_secret_key'] }}"
+
+# Validation messages
+s3_secret_key_empty_fail_msg: >-
+  S3 secret key (s3_secret_key) is empty. This credential is mandatory.
+  Re-run the playbook to be prompted for credentials, or edit
+  {{ hostvars['localhost']['input_project_dir'] }}/image_build_credentials.yml directly.
 
 # EPEL repository for s3cmd installation
 epel10_url: https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
