@@ -1,0 +1,5 @@
+---
+# SSH password for remote OIM server.
+# This file is auto-encrypted with Ansible Vault on first test run.
+# Vault key: .test_creds.key (gitignored, auto-generated)
+oim_password: ""

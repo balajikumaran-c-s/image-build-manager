@@ -1,0 +1,102 @@
+# Copyright 2026 Dell Inc. or its subsidiaries. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# image_build_config.yml — consolidated configuration for the image_build_manager domain.
+#
+# This file is the per-domain input configuration for image_build_manager.
+#
+# Location:
+#   src/input/project_default/image_build_config.yml
+
+# ---------------------------------------------------------------------------
+# S3 Storage Backend
+# ---------------------------------------------------------------------------
+# S3 provider: "minio" (deployed by image_build_manager) or "powerscale" (external).
+# endpoint_url: S3-compatible endpoint (auto-set for MinIO after deploy_minio).
+# NOTE: S3 bucket names are FIXED constants — do NOT change them:
+#   boot-images  — OS boot images (kernel, initramfs, rootfs)
+#   efi-images   — EFI boot artifacts
+s3_configurations:
+  provider: "minio"          # minio | powerscale
+  endpoint_url: ""           # e.g. "https://oim.example.com:9000" (auto-detected for minio)
+
+# ---------------------------------------------------------------------------
+# Repo Manager Output (upstream dependency)
+# ---------------------------------------------------------------------------
+# Directory containing repo_manager output files for this project.
+# The playbook looks for these files inside this directory:
+#   repo_status.yml               — RPM repo URLs, OS metadata, cert paths
+#   functional_group_packages.yml — functional group → RPM package mapping
+#
+# Convention: /opt/omnia/repo_manager/output/<project_name>/
+#
+# Certificate paths in repo_status.yml are absolute and read directly:
+#   repo_manager.certificates.server_crt: /opt/omnia/pulp/settings/certs/pulp_webserver.crt
+repo_manager_output_dir: "/opt/omnia/repo_manager/output/project_default"
+
+# ---------------------------------------------------------------------------
+# ARM Build Host (aarch64)
+# ---------------------------------------------------------------------------
+# IP address of the ARM admin node for aarch64 image builds.
+# Leave empty to skip aarch64 builds entirely.
+# This IP is validated (reachability, SSH, architecture check) before use.
+aarch64_inventory_host_ip: ""
+
+# SSH user for connecting to the ARM build host (default: root)
+aarch64_ssh_user: "root"
+
+# ---------------------------------------------------------------------------
+# Functional Groups
+# ---------------------------------------------------------------------------
+# In standalone mode, functional groups are defined here instead of being
+# generated from provision_config.yml + pxe_mapping.csv (Mode C).
+#
+# Each entry defines an image variant to build. The "name" must end with
+# the target architecture suffix (_x86_64 or _aarch64).
+#
+# The RPM packages for each group are defined in:
+#   <repo_manager_output_dir>/functional_group_packages.yml
+# Edit that file to add/remove packages per functional group.
+#
+# Valid functional group names (from FUNCTIONAL_GROUP_LAYER_MAP):
+#   x86_64:  os_x86_64, slurm_node_x86_64, slurm_control_node_x86_64,
+#            service_kube_control_plane_first_x86_64,
+#            service_kube_control_plane_x86_64, service_kube_node_x86_64,
+#            login_node_x86_64, login_compiler_node_x86_64
+#   aarch64: os_aarch64, slurm_node_aarch64, login_node_aarch64,
+#            login_compiler_node_aarch64
+#
+# Uncomment the groups you need. At minimum, include "os_<arch>" for a
+# base OS image build.
+functional_groups:
+  # - name: "os_x86_64"
+  - name: "slurm_node_x86_64"
+  - name: "slurm_control_node_x86_64"
+  # - name: "service_kube_control_plane_first_x86_64"
+  # - name: "service_kube_control_plane_x86_64"
+  # - name: "service_kube_node_x86_64"
+  # - name: "login_node_x86_64"
+  # - name: "login_compiler_node_x86_64"
+  # - name: "os_aarch64"
+  # - name: "slurm_node_aarch64"
+  # - name: "login_node_aarch64"
+  # - name: "login_compiler_node_aarch64"
+
+# ---------------------------------------------------------------------------
+# Build Image Settings
+# ---------------------------------------------------------------------------
+build_image:
+  job_async: 7200            # Max async wait for image build (seconds)
+  job_retry: 240             # Max retries for async status check
+  job_delay: 30              # Delay between async status checks (seconds)
