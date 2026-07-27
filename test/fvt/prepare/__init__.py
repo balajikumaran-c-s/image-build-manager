@@ -11,8 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Prepare scenario — ansible-playbook image_build_manager.yml --tags prepare.
+
+Deploys MinIO and registry containers, configures systemd services,
+opens firewall ports, sets up s3cmd, and creates S3 buckets.
+
+Suites:
+    container/  — TC_PR_002-007: Containers, services, firewall, s3cmd, registry
+    s3/         — TC_PR_008: S3 bucket verification
+"""

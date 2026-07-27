@@ -60,7 +60,7 @@ oim_ssh_port: 22
 #               The playbook runs from <clone_path>/src/.
 # force_clone:  When true, deletes the existing clone and re-clones fresh.
 #               When false, reuses the existing clone and runs git pull.
-clone_url: ""
+clone_url: "https://github.com/abhishek-sa1/image-build-manager.git"
 clone_path: "/root/image-build-manager"
 force_clone: false
 
@@ -69,25 +69,43 @@ force_clone: false
 # =============================================================================
 # The active dataset under test/datasets/<dataset>/.
 # Each dataset folder contains:
-#   config.yml                        — Top-level build configuration
-#   input/image_build_config.yml      — Image build domain input file
+#   input/                            — Synced to <clone_path>/src/input/<project_name>/
+#     config.yml                      — Top-level build configuration (synced to <clone_path>/config.yml)
+#     image_build_config.yml          — Image build domain input file
+#     image_build_credentials.yml     — Vault-encrypted credentials
+#   repo_manager_output/              — Synced to repo_manager_output_dir (from image_build_config.yml)
+#     repo_status.yml                 — RPM repo URLs, cert paths
+#     functional_group_packages.yml   — Package lists per functional group
+#     certs/                          — Pulp TLS certificates
 #
-# The dataset name maps to a project_name used in input/output paths.
-dataset: "project_default"
+# The dataset name selects the local folder under test/datasets/.
+dataset: "data_set_01"
 
-# Project name used for input/output directory naming on the target server.
+# Project name on the target server. Typically same as dataset.
 # Maps to: <clone_path>/src/input/<project_name>/
 # Maps to: <shared_path>/output/<project_name>/
+# Only change if the target uses a different project name than the dataset.
 project_name: "project_default"
+
+# =============================================================================
+# SYNC — REPO MANAGER OUTPUT
+# =============================================================================
+# When true, pushes repo_manager_output/ from the dataset to the target.
+# Target path: repo_manager_output_dir from image_build_config.yml
+# Default:     /opt/omnia/repo_manager/output/<project_name>/
+#
+# Only needed if the target does not already have repo_manager output.
+sync_output: false
 
 # =============================================================================
 # SYNC — IMAGE BUILD INPUT
 # =============================================================================
-# When true, pushes the local dataset input files to the target server.
+# When true, pushes the local dataset input/ files to the target server.
 # Syncs: test/datasets/<dataset>/input/ -> <clone_path>/src/input/<project_name>/
+#        test/datasets/<dataset>/input/config.yml -> <clone_path>/config.yml
 #
-# This ensures the target server has the correct image_build_config.yml
-# before running the playbook.
+# This ensures the target server has the correct image_build_config.yml,
+# credentials, and config.yml before running the playbook.
 sync_image_build_input: true
 
 # =============================================================================

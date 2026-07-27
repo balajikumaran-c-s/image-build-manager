@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Prepare — S3 suite.
+
+TC_PR_008: Verify S3 buckets created after prepare
+"""

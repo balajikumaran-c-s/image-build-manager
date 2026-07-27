@@ -11,8 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Cleanup — Cleanup verification suite.
+
+TC_CL_002: Verify containers removed
+TC_CL_003: Verify systemd services stopped
+TC_CL_004: Verify firewall ports closed
+TC_CL_005: Verify S3 buckets removed
+TC_CL_006: Verify s3cmd config removed
+TC_CL_007: Verify build_status.yml removed
+TC_CL_008: Verify registry cleaned
+"""

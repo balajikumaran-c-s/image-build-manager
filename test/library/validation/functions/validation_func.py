@@ -48,15 +48,39 @@ def _validate_ip(value: str, field: str) -> List[str]:
     return errors
 
 
+REQUIRED_FIELDS = [
+    "dataset",
+    "project_name",
+    "clone_path",
+    "shared_path",
+    "report_path",
+    "report_name",
+]
+
+REQUIRED_DATASET_FILES = [
+    "input/config.yml",
+    "input/image_build_config.yml",
+    "input/image_build_credentials.yml",
+]
+
+
 def validate_test_config() -> Dict[str, Any]:
     """Validate test_config.yml.
+
+    Checks:
+    - File exists and is valid YAML
+    - All required fields are present (no fallback defaults)
+    - OIM IP format (if set)
+    - Dataset directory and required files exist
+    - Paths are absolute where required
+    - report_path/report_name format
 
     Returns:
         Dict with 'valid', 'errors', 'warnings'.
     """
     config_path = os.path.join(_MODULE_ROOT, "test_config.yml")
-    errors = []
-    warnings = []
+    errors: List[str] = []
+    warnings: List[str] = []
 
     if not os.path.exists(config_path):
         return {
@@ -68,73 +92,90 @@ def validate_test_config() -> Dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f) or {}
 
-    # Validate OIM IP (optional — empty means local)
-    oim_ip = config.get("oim_server_ip", "")
-    if oim_ip:
-        errors.extend(_validate_ip(oim_ip, "oim_server_ip"))
+    # --- Required fields ---
+    for field in REQUIRED_FIELDS:
+        if field not in config or config[field] is None:
+            errors.append(
+                f"Required field missing in test_config.yml: {field}"
+            )
 
-    # Validate dataset exists
-    dataset = config.get("dataset", "project_default")
+    # oim_server_ip must be present (empty string is valid = local)
+    if "oim_server_ip" not in config:
+        errors.append(
+            "Required field missing: oim_server_ip "
+            "(set to \"\" for local mode)"
+        )
+
+    # Stop early if required fields are missing
+    if errors:
+        return {
+            "valid": False, "errors": errors, "warnings": warnings,
+        }
+
+    # --- OIM IP format ---
+    oim_ip = config["oim_server_ip"]
+    if oim_ip:
+        errors.extend(_validate_ip(str(oim_ip), "oim_server_ip"))
+
+    # --- Dataset validation ---
+    dataset = config["dataset"]
     dataset_path = os.path.join(_MODULE_ROOT, "datasets", dataset)
     if not os.path.isdir(dataset_path):
         errors.append(
-            f"Dataset directory not found: datasets/{dataset}"
+            f"Dataset directory not found: datasets/{dataset}/"
         )
+    else:
+        for rel_file in REQUIRED_DATASET_FILES:
+            full = os.path.join(dataset_path, rel_file)
+            if not os.path.isfile(full):
+                errors.append(
+                    f"Required file missing: datasets/{dataset}/"
+                    f"{rel_file}"
+                )
 
-    # Validate dataset input directory
-    input_path = os.path.join(dataset_path, "input")
-    if os.path.isdir(dataset_path) and not os.path.isdir(input_path):
+    # --- Clone path ---
+    clone_path = config["clone_path"]
+    if not os.path.isabs(clone_path):
         errors.append(
-            f"Dataset input dir not found: datasets/{dataset}/input/"
+            f"clone_path must be absolute: {clone_path}"
         )
 
-    # Validate image_build_config.yml in dataset input
-    ib_config = os.path.join(
-        input_path, "image_build_config.yml"
-    )
-    if os.path.isdir(input_path) and not os.path.isfile(ib_config):
-        warnings.append(
-            "image_build_config.yml not found in dataset input"
+    # --- Shared path ---
+    shared_path = config["shared_path"]
+    if not os.path.isabs(shared_path):
+        errors.append(
+            f"shared_path must be absolute: {shared_path}"
         )
 
-    # Validate clone_url
+    # --- Clone URL ---
     clone_url = config.get("clone_url", "")
     if clone_url and not (
-        clone_url.startswith("http") or clone_url.startswith("git@")
+        clone_url.startswith("http")
+        or clone_url.startswith("git@")
     ):
         warnings.append(
             f"clone_url doesn't look like a valid URL: {clone_url}"
         )
 
-    # Validate clone_path
-    clone_path = config.get("clone_path", "")
-    if clone_path and not os.path.isabs(clone_path):
-        errors.append(
-            f"clone_path must be absolute: {clone_path}"
-        )
-
-
-    # Validate shared_path
-    shared_path = config.get("shared_path", "")
-    if shared_path and not os.path.isabs(shared_path):
-        errors.append(
-            f"shared_path must be absolute: {shared_path}"
-        )
-
-    # Validate report_path
-    report_path = config.get("report_path", "")
-    if report_path and " " in report_path:
+    # --- Report path ---
+    report_path = config["report_path"]
+    if " " in str(report_path):
         errors.append("report_path must not contain spaces")
 
-    # Validate report_name
-    report_name = config.get("report_name", "")
-    if report_name and not re.match(
-        r'^[a-zA-Z0-9_-]+$', report_name
-    ):
+    # --- Report name ---
+    report_name = config["report_name"]
+    if not re.match(r'^[a-zA-Z0-9_-]+$', str(report_name)):
         errors.append(
             "report_name must contain only letters, numbers, "
             "underscores, hyphens"
         )
+
+    # --- Remote mode checks ---
+    if oim_ip:
+        if "oim_ssh_user" not in config:
+            errors.append(
+                "oim_ssh_user required when oim_server_ip is set"
+            )
 
     return {
         "valid": len(errors) == 0,

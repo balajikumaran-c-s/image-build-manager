@@ -60,13 +60,13 @@ from ..vars.common_vars import (
 def _get_shared_path() -> str:
     """Get shared_path from test_config or default."""
     config = load_test_config()
-    return config.get("shared_path", SHARED_PATH)
+    return config["shared_path"]
 
 
 def _get_project_name() -> str:
     """Get project_name from test_config or default."""
     config = load_test_config()
-    return config.get("project_name", "project_default")
+    return config["project_name"]
 
 
 def get_configured_functional_groups(
@@ -85,7 +85,7 @@ def get_configured_functional_groups(
         List of functional group name strings.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", "")
+    clone_path = config["clone_path"]
     project_name = _get_project_name()
 
     # Try deployed config first, then clone path
@@ -138,7 +138,7 @@ def _get_s3_provider(host) -> str:
     Returns 'minio' or 'powerscale' or empty string.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", "")
+    clone_path = config["clone_path"]
     project_name = _get_project_name()
 
     paths_to_try = []
@@ -733,7 +733,7 @@ def _get_image_packages_from_config(
     Reads functional_group_packages.yml on the target host.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", "")
+    clone_path = config["clone_path"]
     project = _get_project_name()
 
     # Try repo_manager output on target
@@ -1157,7 +1157,7 @@ def check_credentials_removed(host) -> Dict[str, Any]:
         Dict with 'success', 'results', 'details'.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
+    clone_path = config["clone_path"]
     project = _get_project_name()
     input_dir = f"{clone_path}/src/input/{project}"
 
@@ -1362,7 +1362,7 @@ def check_credentials_present(host) -> Dict[str, Any]:
         Dict with 'success', 'details'.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
+    clone_path = config["clone_path"]
     project = _get_project_name()
     input_dir = f"{clone_path}/src/input/{project}"
     cred_path = f"{input_dir}/{CREDENTIALS_FILE_NAME}"
@@ -1388,7 +1388,7 @@ def check_clone_status(host) -> Dict[str, Any]:
         'last_commit', 'details'.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
+    clone_path = config["clone_path"]
 
     dir_cmd = host.run(CMDS["dir_exists"].format(path=clone_path))
     if dir_cmd.rc != 0 or "exists" not in dir_cmd.stdout:
@@ -1490,7 +1490,7 @@ def check_input_config_exists(host) -> Dict[str, Any]:
         Dict with 'success', 'details'.
     """
     config = load_test_config()
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
+    clone_path = config["clone_path"]
     project = _get_project_name()
     cfg_path = (
         f"{clone_path}/src/input/{project}/image_build_config.yml"

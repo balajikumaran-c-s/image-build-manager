@@ -47,8 +47,13 @@ from library.functions.host_func import (
     clone_repo_on_remote,
     sync_image_build_input,
     sync_config_to_remote,
+    sync_repo_manager_output,
 )
 from library.functions.formatting_func import log
+from library.validation.functions.validation_func import (
+    validate_all,
+    ConfigValidationError,
+)
 
 
 # =============================================================================
@@ -174,7 +179,16 @@ def pytest_collection_modifyitems(session, config, items):
 # =============================================================================
 
 def pytest_sessionstart(session):
-    """Session startup: encrypt credentials, clone repo, sync files, init report."""
+    """Session startup: validate config, encrypt credentials, clone repo, sync files, init report."""
+    # Validate config first — fail fast with clear errors
+    try:
+        result = validate_all()
+        for warn in result.get("warnings", []):
+            log(f"Config warning: {warn}", "WARN")
+    except ConfigValidationError as exc:
+        log(str(exc), "FAIL")
+        pytest.exit(str(exc), returncode=1)
+
     try:
         encrypt_test_credentials()
     except (ValueError, OSError):
@@ -209,12 +223,27 @@ def pytest_sessionstart(session):
                 "WARN",
             )
 
+    if config.get("sync_output", False):
+        out_result = sync_repo_manager_output(host)
+        if out_result["success"]:
+            log(out_result["details"], "OK")
+        else:
+            log(
+                f"Output sync failed: {out_result['error']}",
+                "WARN",
+            )
+
     # Initialize test report
+    # Detect scenario name from test paths (fvt/<scenario>/...)
+    valid_scenarios = {
+        "image_build_manager", "validate", "prepare",
+        "build", "cleanup",
+    }
     module_name = "image_build_manager"
     test_paths = session.config.args if hasattr(session.config, 'args') else []
     for p in test_paths:
         for part in p.replace("\\", "/").split("/"):
-            if part.startswith("image_build_"):
+            if part in valid_scenarios:
                 module_name = part
                 break
 

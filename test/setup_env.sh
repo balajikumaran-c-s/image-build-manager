@@ -16,11 +16,13 @@
 # =============================================================================
 # Image Build Manager — Test Environment Setup
 # =============================================================================
-# One-time setup script. Creates a Python virtual environment, installs all
-# dependencies, and prints the exact steps to configure and run tests.
+# One-time setup script. Creates a Python virtual environment and installs
+# all dependencies from requirements.txt.
 #
 # Usage:
-#   bash setup_env.sh
+#   bash setup_env.sh            # Normal setup
+#   bash setup_env.sh --force    # Delete .venv and recreate from scratch
+#   bash setup_env.sh --debug    # Verbose pip output (show install details)
 # =============================================================================
 
 set -euo pipefail
@@ -28,6 +30,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="${SCRIPT_DIR}/.venv"
 REQUIREMENTS="${SCRIPT_DIR}/requirements.txt"
+
+FORCE=false
+DEBUG=false
+PIP_QUIET="--quiet"
+
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE=true ;;
+        --debug) DEBUG=true; PIP_QUIET="" ;;
+        *)
+            echo "Usage: bash setup_env.sh [--force] [--debug]"
+            echo "  --force   Delete existing .venv and recreate"
+            echo "  --debug   Show verbose pip install output"
+            exit 1
+            ;;
+    esac
+done
 
 echo ""
 echo "================================================================="
@@ -62,6 +81,11 @@ echo "  [OK] Python: $($PYTHON_CMD --version)"
 # -----------------------------------------------
 # Step 2: Create virtual environment
 # -----------------------------------------------
+if [ "$FORCE" = true ] && [ -d "$VENV_DIR" ]; then
+    echo "  [...] Removing existing virtual environment (--force)"
+    rm -rf "$VENV_DIR"
+fi
+
 if [ -d "$VENV_DIR" ]; then
     echo "  [OK] Virtual environment already exists: .venv/"
 else
@@ -77,91 +101,34 @@ fi
 source "${VENV_DIR}/bin/activate"
 
 echo "  [...] Upgrading pip"
-pip install --upgrade pip --quiet
+pip install --upgrade pip $PIP_QUIET
 
 echo "  [...] Installing dependencies from requirements.txt"
-pip install -r "$REQUIREMENTS" --quiet
+pip install -r "$REQUIREMENTS" $PIP_QUIET
 
 # pytest-order for test ordering
 if ! pip show pytest-order &>/dev/null; then
     echo "  [...] Installing pytest-order"
-    pip install pytest-order --quiet
+    pip install pytest-order $PIP_QUIET
 fi
 
 echo "  [OK] All dependencies installed"
 
 echo ""
 echo "================================================================="
-echo "  Environment Ready — Follow the steps below"
+echo "  Environment Ready"
 echo "================================================================="
 echo ""
-echo "  STEP 1: Activate the virtual environment"
-echo "  ─────────────────────────────────────────"
+echo "  Next steps:"
 echo "    source .venv/bin/activate"
+echo "    vi test_config.yml                  # See docs/test_config.md"
+echo "    ./run_validation.sh --help          # Full usage"
+echo "    ./run_validation.sh image_build_manager verify --marker sanity"
 echo ""
-echo "  STEP 2: Configure target server"
-echo "  ────────────────────────────────"
-echo "    Edit test_config.yml:"
-echo ""
-echo "    LOCAL MODE (running on the target server itself):"
-echo "      oim_server_ip: \"\"          ← leave empty (default)"
-echo "      No other connection settings needed."
-echo ""
-echo "    REMOTE MODE (running against a remote OIM server):"
-echo "      oim_server_ip: \"<IP>\"      ← MANDATORY: IP of the OIM server"
-echo "      oim_ssh_user: root          ← SSH user (default: root)"
-echo ""
-echo "      Optional (only if repo is not already on the target):"
-echo "        clone_url:  \"<git_url>\"  ← Git URL to clone on target"
-echo "        clone_path: \"/root/...\"  ← Where to clone on target"
-echo ""
-echo "    vi test_config.yml"
-echo ""
-echo "  STEP 3: Configure SSH credentials (REMOTE MODE only)"
-echo "  ─────────────────────────────────────────────────────"
-echo "    Only needed when oim_server_ip is set."
-echo ""
-echo "    Edit test_creds.yml and set:"
-echo "      oim_password     — SSH password for the OIM server"
-echo ""
-echo "    vi test_creds.yml"
-echo ""
-echo "    Note: test_creds.yml is auto-encrypted with Ansible Vault on"
-echo "    first run. The vault key is stored in .test_creds.key (gitignored)."
-echo "    If using passwordless SSH, set oim_password to any dummy value."
-echo ""
-echo "  STEP 4: Configure datasets (OPTIONAL)"
-echo "  ──────────────────────────────────────"
-echo "    Datasets are in: datasets/project_default/input/"
-echo ""
-echo "    If the target already has the input files deployed:"
-echo "      → Set sync_image_build_input: false in test_config.yml"
-echo ""
-echo "    If you want to push input files from this machine to target:"
-echo "      → Set sync_image_build_input: true (default)"
-echo "      → Edit the files under datasets/project_default/input/:"
-echo "          image_build_config.yml       — Domain input config"
-echo "          image_build_credentials.yml  — Vault-encrypted creds"
-echo "          repo_manager_output/         — Upstream dependency output"
-echo ""
-echo "  STEP 5: Run tests"
-echo "  ─────────────────"
-echo "    # Verify existing deployment (no playbook execution):"
-echo "    ./run_validation.sh image_builder verify --marker sanity"
-echo ""
-echo "    # Deploy + verify a specific tag:"
-echo "    ./run_validation.sh image_build_prepare test"
-echo ""
-echo "    # Run all enabled suites from test_run_config.yml:"
-echo "    ./run_validation.sh --config"
-echo ""
-echo "    # For full usage and examples:"
-echo "    ./run_validation.sh --help"
-echo ""
-echo "  STEP 6: View reports"
-echo "  ────────────────────"
-echo "    Reports are generated in reports/ after each run."
-echo "    Open HTML: python3 -m http.server 8899 --directory reports/"
+echo "  Documentation:"
+echo "    docs/test_config.md                 # Configuration reference"
+echo "    docs/test_creds.md                  # Credentials setup"
+echo "    docs/test_run_config.md             # Batch execution config"
 echo ""
 echo "================================================================="
 echo ""
