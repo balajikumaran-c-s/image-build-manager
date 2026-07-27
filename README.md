@@ -109,12 +109,12 @@ exists on the host. No staging or copying is needed — the cert is used as-is.
 image_build_config.yml                functional_group_packages.yml
 ┌──────────────────────────┐          ┌──────────────────────────────────┐
 │ functional_groups:       │          │ base_packages:                   │
-│   - name: slurm_node_x86│──────┐   │   - systemd                     │
-│   - name: slurm_ctrl_x86│      │   │   - kernel                      │
-│   - name: os_x86_64     │      │   │   - dracut                      │
-└──────────────────────────┘      │   │   - ...                         │
+│   - name: slurm_node_x86 │──────┐   │   - systemd                      │
+│   - name: slurm_ctrl_x86 │      │   │   - kernel                       │
+│   - name: os_x86_64      │      │   │   - dracut                       │
+└──────────────────────────┘      │   │   - ...                          │
                                   │   │ functional_groups:               │
-                                  └──▶│   slurm_node_x86_64:            │
+                                  └──>│   slurm_node_x86_64:             │
                                       │     packages:                    │
                                       │       - munge                    │
                                       │       - slurm-slurmd             │
