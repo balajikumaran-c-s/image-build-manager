@@ -11,8 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Image Build Manager — Registry suite.
+
+TC_IB_006: Verify x86_64 images in registry
+TC_IB_007: Verify aarch64 images in registry
+TC_IB_008: Verify build_status.yml exists
+TC_IB_009: Verify all x86_64 functional groups built
+TC_IB_010: Verify all aarch64 functional groups built
+"""

@@ -33,11 +33,11 @@
 #   -v, --verbose     Increase verbosity
 #
 # Scenarios:
-#   image_builder           Full verification suite
-#   image_build_prepare     Prepare tag tests
-#   image_build_build       Build tag tests
-#   image_build_validate    Validate tag tests
-#   image_build_cleanup     Cleanup tag tests
+#   image_build_manager     Full end-to-end (deploy without tags + verify)
+#   validate                Validate tag tests
+#   prepare                 Prepare tag tests
+#   build                   Build tag tests
+#   cleanup                 Cleanup tag tests
 # =============================================================================
 
 set -euo pipefail
@@ -72,6 +72,7 @@ COMMAND="${2:-test}"
 SUITE=""
 MARKER=""
 VERBOSE=""
+DEBUG=""
 
 if [[ $# -gt 2 ]]; then
     shift 2
@@ -87,6 +88,11 @@ if [[ $# -gt 2 ]]; then
                 ;;
             -v|--verbose)
                 VERBOSE="-v"
+                shift
+                ;;
+            --debug)
+                DEBUG="true"
+                VERBOSE="-vvs"
                 shift
                 ;;
             *)
@@ -258,6 +264,49 @@ case "$SCENARIO" in
         run_config_mode
         exit 0
         ;;
+    --completion)
+        # Emit bash completion function. Usage:
+        #   eval "$(./run_validation.sh --completion)"
+        cat <<'COMP_EOF'
+_run_validation() {
+    local cur prev words cword
+    _init_completion || return
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${COMP_WORDS[0]}")" 2>/dev/null && pwd)"
+    [[ -z "$script_dir" ]] && script_dir="."
+
+    local commands="deploy verify test"
+    local options="--suite --marker -v --verbose --debug"
+
+    case "$cword" in
+        1)
+            local scenarios
+            scenarios=$(find "${script_dir}/fvt" -mindepth 1 -maxdepth 1 -type d -not -name '__pycache__' -printf '%f ' 2>/dev/null)
+            COMPREPLY=( $(compgen -W "${scenarios} all list --config --help" -- "$cur") )
+            ;;
+        2)
+            COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )
+            ;;
+        *)
+            if [[ "$prev" == "--suite" ]]; then
+                local scenario="${words[1]}"
+                local suites
+                suites=$(find "${script_dir}/fvt/${scenario}" -mindepth 1 -maxdepth 1 -type d -not -name '__pycache__' -printf '%f ' 2>/dev/null)
+                COMPREPLY=( $(compgen -W "${suites}" -- "$cur") )
+            elif [[ "$prev" == "--marker" ]]; then
+                COMPREPLY=( $(compgen -W "sanity x86_64 aarch64 functional regression" -- "$cur") )
+            else
+                COMPREPLY=( $(compgen -W "${options}" -- "$cur") )
+            fi
+            ;;
+    esac
+}
+complete -F _run_validation ./run_validation.sh
+complete -F _run_validation run_validation.sh
+COMP_EOF
+        exit 0
+        ;;
     all)
         export REPORT_ID=$(date '+%Y%m%d%H%M%S')
         echo -e "${BLUE}=================================================================${NC}"
@@ -304,13 +353,14 @@ case "$SCENARIO" in
         echo "  --suite <name>    Filter by subfolder (container, s3, registry, etc.)"
         echo "  --marker <expr>   Filter by pytest marker expression"
         echo "  -v, --verbose     Increase pytest verbosity"
+        echo "  --debug           Enable full debug output (pytest -vvs + debug env)"
         echo ""
         echo -e "${YELLOW}Scenarios:${NC}"
-        echo "  image_builder          Verify existing deployment (no playbook)"
-        echo "  image_build_validate   Deploy --tags validate + verify inputs"
-        echo "  image_build_prepare    Deploy --tags prepare + verify infrastructure"
-        echo "  image_build_build      Deploy --tags build + verify images"
-        echo "  image_build_cleanup    Deploy --tags cleanup + verify removal"
+        echo "  image_build_manager    Full end-to-end (deploy without tags + verify)"
+        echo "  validate               Deploy --tags validate + verify inputs"
+        echo "  prepare                Deploy --tags prepare + verify infrastructure"
+        echo "  build                  Deploy --tags build + verify images"
+        echo "  cleanup                Deploy --tags cleanup + verify removal"
         echo ""
         echo -e "${YELLOW}Markers:${NC}"
         echo "  sanity               Baseline must-pass tests"
@@ -326,31 +376,31 @@ case "$SCENARIO" in
         echo -e "${YELLOW}Examples:${NC}"
         echo ""
         echo "  # Verify all sanity tests on an existing deployment"
-        echo "  $0 image_builder verify --marker sanity"
+        echo "  $0 image_build_manager verify --marker sanity"
         echo ""
         echo "  # Verify only x86_64 tests"
-        echo "  $0 image_builder verify --marker x86_64"
+        echo "  $0 image_build_manager verify --marker x86_64"
         echo ""
         echo "  # Verify both architectures (OR)"
-        echo "  $0 image_builder verify --marker x86_64,aarch64"
+        echo "  $0 image_build_manager verify --marker x86_64,aarch64"
         echo ""
         echo "  # Verify only x86_64 sanity tests (AND)"
-        echo "  $0 image_builder verify --marker x86_64+sanity"
+        echo "  $0 image_build_manager verify --marker x86_64+sanity"
         echo ""
         echo "  # Verify only container tests"
-        echo "  $0 image_builder verify --suite container"
+        echo "  $0 image_build_manager verify --suite container"
         echo ""
         echo "  # Deploy prepare tag and verify"
-        echo "  $0 image_build_prepare test"
+        echo "  $0 prepare test"
         echo ""
         echo "  # Deploy build tag, verify x86_64 images only"
-        echo "  $0 image_build_build test --marker x86_64"
+        echo "  $0 build test --marker x86_64"
         echo ""
         echo "  # Run cleanup (deploy + verify removal)"
-        echo "  $0 image_build_cleanup test"
+        echo "  $0 cleanup test"
         echo ""
         echo "  # Deploy only (no verification)"
-        echo "  $0 image_build_prepare deploy"
+        echo "  $0 prepare deploy"
         echo ""
         echo "  # Run all scenarios with x86_64 marker"
         echo "  $0 all test --marker x86_64"
@@ -359,16 +409,19 @@ case "$SCENARIO" in
         echo "  $0 --config"
         echo ""
         echo -e "${YELLOW}Typical Workflow:${NC}"
-        echo "  $0 image_build_cleanup test              # 1. Clean previous state"
-        echo "  $0 image_build_validate test              # 2. Validate inputs"
-        echo "  $0 image_build_prepare test               # 3. Prepare infrastructure"
-        echo "  $0 image_build_build test --marker x86_64 # 4. Build images"
-        echo "  $0 image_builder verify --marker sanity   # 5. Full verification"
+        echo "  $0 cleanup test                          # 1. Clean previous state"
+        echo "  $0 validate test                          # 2. Validate inputs"
+        echo "  $0 prepare test                          # 3. Prepare infrastructure"
+        echo "  $0 build test --marker x86_64             # 4. Build images"
+        echo "  $0 image_build_manager verify --marker sanity  # 5. Full verification"
         echo ""
         echo -e "${YELLOW}Configuration:${NC}"
         echo "  test_config.yml      Target server, sync, report settings"
         echo "  test_creds.yml       SSH credentials (Ansible Vault encrypted)"
         echo "  test_run_config.yml  Batch suite definitions for --config mode"
+        echo ""
+        echo -e "${YELLOW}Tab Completion:${NC}"
+        echo "  eval \"\$($0 --completion)\""
         echo ""
         echo -e "${YELLOW}Reports:${NC}"
         echo "  Reports are generated in reports/ after each run."
@@ -416,6 +469,7 @@ fi
 # Export vars for TestReport in conftest.py
 export OMNIA_SUITE="${SUITE:-all}"
 export OMNIA_MARKER="${MARKER:-}"
+[[ -n "$DEBUG" ]] && export OMNIA_DEBUG="true"
 LOG_DIR="${SCRIPT_DIR}/reports/logs"
 mkdir -p "${LOG_DIR}"
 export OMNIA_LOG_FILE="${LOG_DIR}/${SCENARIO}_${COMMAND}_${REPORT_ID}.log"
@@ -428,8 +482,9 @@ echo -e "${BLUE}  Image Build Manager — Validation Runner${NC}"
 echo -e "${BLUE}=================================================================${NC}"
 echo -e "  Scenario  : ${GREEN}${SCENARIO}${NC}"
 echo -e "  Command   : ${GREEN}${COMMAND}${NC}"
-[[ -n "$SUITE" ]]  && echo -e "  Suite     : ${GREEN}${SUITE}${NC}"
-[[ -n "$MARKER" ]] && echo -e "  Marker    : ${GREEN}${MARKER}${NC}"
+[[ -n "$SUITE" ]]       && echo -e "  Suite     : ${GREEN}${SUITE}${NC}"
+[[ -n "$MARKER" ]]      && echo -e "  Marker    : ${GREEN}${MARKER}${NC}"
+[[ -n "$DEBUG" ]] && echo -e "  Debug     : ${YELLOW}yes${NC}"
 echo -e "  Report ID : ${GREEN}${REPORT_ID}${NC}"
 echo -e "${BLUE}=================================================================${NC}"
 echo ""

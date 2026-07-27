@@ -9,57 +9,44 @@ server before running tests.
 ```
 datasets/
   <dataset_name>/
-    config.yml                      # Top-level build configuration
-    input/
-      image_build_config.yml        # Image build domain input file
+    input/                              # Synced to <clone_path>/src/input/<project_name>/
+      config.yml                        # Top-level build configuration (also -> <clone_path>/config.yml)
+      image_build_config.yml            # Image build domain input file
+      image_build_credentials.yml       # Vault-encrypted credentials
+    repo_manager_output/                # Synced to repo_manager_output_dir (when sync_output: true)
+      repo_status.yml
+      functional_group_packages.yml
+      certs/
 ```
 
 ### Required Files
 
 | File | Description |
 |------|-------------|
-| `config.yml` | Top-level config: hostname, domain, admin_nic_ip |
+| `input/config.yml` | Top-level config: hostname, domain, admin_nic_ip |
 | `input/image_build_config.yml` | S3 backend, repo_manager output path, functional groups, ARM host IP |
+| `input/image_build_credentials.yml` | S3 and provision credentials (Vault-encrypted) |
 
 ### Sync Behavior
 
-- **`sync_image_build_input: true`** in `test_config.yml` pushes
-  `datasets/<dataset>/input/` to `<clone_path>/src/input/<project_name>/`
-  on the target server.
-- **`sync_local_repo_output: true`** pushes repo_manager output from
-  `local_repo_output_path` to `repo_manager_output_dir` on the target.
-- `config.yml` is synced to `<clone_path>/config.yml` alongside input sync.
+| Setting in `test_config.yml` | What gets synced |
+|------------------------------|------------------|
+| `sync_image_build_input: true` | `input/` → `<clone_path>/src/input/<project_name>/` + `input/config.yml` → `<clone_path>/config.yml` |
+| `sync_output: true` | `repo_manager_output/` → `<repo_manager_output_dir>/` from `image_build_config.yml` |
 
-## Default Dataset: `project_default`
+## Default Dataset: `data_set_01`
 
-```
-datasets/project_default/
-  config.yml
-  input/
-    image_build_config.yml
-```
-
-### config.yml
-
-Contains hostname, domain, and admin NIC IP for the target server.
-Copy from the target server's existing `config.yml` or create manually.
-
-### input/image_build_config.yml
-
-Contains:
-- **s3_configurations**: Provider type (`minio` or `powerscale`), endpoint URL
-- **repo_manager_output_dir**: Path to repo_manager output on the target
-- **aarch64_inventory_host_ip**: ARM build host IP (empty to skip aarch64)
-- **functional_groups**: List of functional groups to build
-- **build_image**: Async job timeouts
+See [`data_set_01/README.md`](data_set_01/README.md) for field details.
 
 ## Creating a New Dataset
 
 ```bash
-mkdir -p datasets/my_dataset/input
-# Copy and edit the config files:
-cp datasets/project_default/config.yml datasets/my_dataset/
-cp datasets/project_default/input/image_build_config.yml datasets/my_dataset/input/
-# Edit as needed, then update test_config.yml:
+mkdir -p datasets/my_dataset/{input,repo_manager_output/certs}
+# Copy and edit:
+cp datasets/data_set_01/input/config.yml datasets/my_dataset/input/
+cp datasets/data_set_01/input/image_build_config.yml datasets/my_dataset/input/
+cp datasets/data_set_01/input/image_build_credentials.yml datasets/my_dataset/input/
+cp -r datasets/data_set_01/repo_manager_output/* datasets/my_dataset/repo_manager_output/
+# Update test_config.yml:
 #   dataset: "my_dataset"
 ```

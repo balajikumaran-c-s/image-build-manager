@@ -107,7 +107,7 @@ class PlaybookRunner:
         v = verbosity if verbosity is not None else self._verbosity
         t = timeout if timeout is not None else self._timeout
 
-        clone_path = self._config.get("clone_path", "")
+        clone_path = self._config["clone_path"]
         if playbook is None:
             playbook = PLAYBOOK_ENTRY_POINT
         if workdir is None:
@@ -216,7 +216,7 @@ class PlaybookRunner:
             return cmd
 
         host = self._config["oim_server_ip"]
-        user = self._config.get("oim_ssh_user", "root")
+        user = self._config["oim_ssh_user"]
         port = str(self._config.get("oim_ssh_port", 22))
         password = self._credentials.get("oim_password", "")
 

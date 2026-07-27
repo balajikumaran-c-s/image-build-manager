@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Image Build Manager — Container suite.
+
+TC_IB_001: Verify S3 storage backend (MinIO or PowerScale)
+TC_IB_002: Verify registry container is running
+"""

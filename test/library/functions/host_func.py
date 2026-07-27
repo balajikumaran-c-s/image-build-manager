@@ -212,10 +212,10 @@ def is_local_execution() -> bool:
     - oim_server_ip matches a local IP address
     """
     config = load_test_config()
-    oim_ip = config.get("oim_server_ip", "").strip()
+    oim_ip = config["oim_server_ip"]
     if not oim_ip:
         return True
-    return _is_local_ip(oim_ip)
+    return _is_local_ip(str(oim_ip).strip())
 
 
 # =============================================================================
@@ -233,14 +233,14 @@ def get_testinfra_host():
     """
     config = load_test_config()
     credentials = load_test_credentials()
-    oim_ip = config.get("oim_server_ip", "").strip()
+    oim_ip = str(config["oim_server_ip"]).strip()
 
     # Local execution
     if not oim_ip or _is_local_ip(oim_ip):
         return testinfra.get_host("local://")
 
     # Remote — SSH
-    ssh_user = config.get("oim_ssh_user", "root")
+    ssh_user = config["oim_ssh_user"]
     ssh_port = config.get("oim_ssh_port", 22)
     ssh_password = credentials.get("oim_password", "")
 
@@ -297,8 +297,8 @@ def clone_repo_on_remote(host) -> Dict[str, Any]:
         Dict with 'success', 'details', 'error'.
     """
     config = load_test_config()
-    clone_url = config.get("clone_url", DEFAULT_CLONE_URL)
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
+    clone_url = config.get("clone_url", "")
+    clone_path = config["clone_path"]
     force_clone = config.get("force_clone", False)
 
     result = {"success": False, "details": "", "error": ""}
@@ -349,10 +349,10 @@ def sync_image_build_input(host) -> Dict[str, Any]:  # pylint: disable=unused-ar
         Dict with 'success', 'details', 'error'.
     """
     config = load_test_config()
-    dataset = config.get("dataset", "project_default")
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
-    project_name = config.get("project_name", "project_default")
-    oim_ip = config.get("oim_server_ip", "").strip()
+    dataset = config["dataset"]
+    clone_path = config["clone_path"]
+    project_name = config["project_name"]
+    oim_ip = config["oim_server_ip"].strip()
     ssh_user = config.get("oim_ssh_user", "root")
 
     result = {"success": False, "details": "", "error": ""}
@@ -412,15 +412,15 @@ def sync_config_to_remote(host) -> Dict[str, Any]:  # pylint: disable=unused-arg
         Dict with 'success', 'details', 'error'.
     """
     config = load_test_config()
-    dataset = config.get("dataset", "project_default")
-    clone_path = config.get("clone_path", DEFAULT_CLONE_PATH)
-    oim_ip = config.get("oim_server_ip", "").strip()
+    dataset = config["dataset"]
+    clone_path = config["clone_path"]
+    oim_ip = config["oim_server_ip"].strip()
     ssh_user = config.get("oim_ssh_user", "root")
 
     result = {"success": False, "details": "", "error": ""}
 
     local_config = os.path.join(
-        MODULE_ROOT, "datasets", dataset, "config.yml"
+        MODULE_ROOT, "datasets", dataset, "input", "config.yml"
     )
     if not os.path.isfile(local_config):
         result["error"] = (
@@ -455,4 +455,98 @@ def sync_config_to_remote(host) -> Dict[str, Any]:  # pylint: disable=unused-arg
 
     result["success"] = True
     result["details"] = f"Synced config.yml -> {remote_config}"
+    return result
+
+
+def sync_repo_manager_output(host) -> Dict[str, Any]:  # pylint: disable=unused-argument
+    """Push repo_manager_output from dataset to target.
+
+    Reads repo_manager_output_dir from image_build_config.yml in the
+    dataset. Falls back to /opt/omnia/repo_manager/output/<project_name>/.
+
+    Syncs: test/datasets/<dataset>/repo_manager_output/
+        -> <repo_manager_output_dir>/
+
+    Returns:
+        Dict with 'success', 'details', 'error'.
+    """
+    config = load_test_config()
+    dataset = config["dataset"]
+    project_name = config["project_name"]
+    oim_ip = config["oim_server_ip"].strip()
+    ssh_user = config.get("oim_ssh_user", "root")
+
+    result = {"success": False, "details": "", "error": ""}
+
+    local_output = os.path.join(
+        MODULE_ROOT, "datasets", dataset, "repo_manager_output"
+    )
+    if not os.path.isdir(local_output):
+        result["error"] = (
+            f"repo_manager_output not found: {local_output}"
+        )
+        return result
+
+    # Read repo_manager_output_dir from image_build_config.yml
+    local_ibm_config = os.path.join(
+        MODULE_ROOT, "datasets", dataset, "input",
+        "image_build_config.yml",
+    )
+    remote_output_dir = (
+        f"/opt/omnia/repo_manager/output/{project_name}"
+    )  # fallback; overridden from image_build_config.yml if available
+    if os.path.isfile(local_ibm_config):
+        try:
+            with open(local_ibm_config, "r", encoding="utf-8") as fh:
+                ibm_cfg = yaml.safe_load(fh) or {}
+            configured_dir = ibm_cfg.get("repo_manager_output_dir", "")
+            if configured_dir:
+                remote_output_dir = configured_dir
+        except (yaml.YAMLError, OSError):
+            pass
+
+    if is_local_execution():
+        os.makedirs(remote_output_dir, exist_ok=True)
+        rsync_result = subprocess.run(
+            [
+                "rsync", "-avz",
+                f"{local_output}/",
+                f"{remote_output_dir}/",
+            ],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+        if rsync_result.returncode != 0:
+            result["error"] = (
+                f"rsync failed: {rsync_result.stderr}"
+            )
+            return result
+    else:
+        # Ensure remote dir exists
+        subprocess.run(
+            [
+                "ssh", *SSH_OPTS.split(),
+                f"{ssh_user}@{oim_ip}",
+                f"mkdir -p {remote_output_dir}",
+            ],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+        rsync_result = subprocess.run(
+            [
+                "rsync", "-avz",
+                "-e", f"ssh {SSH_OPTS}",
+                f"{local_output}/",
+                f"{ssh_user}@{oim_ip}:{remote_output_dir}/",
+            ],
+            capture_output=True, text=True, timeout=120, check=False,
+        )
+        if rsync_result.returncode != 0:
+            result["error"] = (
+                f"rsync to remote failed: {rsync_result.stderr}"
+            )
+            return result
+
+    result["success"] = True
+    result["details"] = (
+        f"Synced repo_manager_output -> {remote_output_dir}"
+    )
     return result

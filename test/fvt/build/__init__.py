@@ -11,8 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Build scenario — ansible-playbook image_build_manager.yml --tags build.
+
+Builds x86_64 and aarch64 OS images, pushes to S3 and registry,
+writes build_status.yml.
+
+Suites:
+    s3/         — TC_BD_002-003: S3 image verification per architecture
+    registry/   — TC_BD_004-006: Registry images, build status, functional groups
+"""

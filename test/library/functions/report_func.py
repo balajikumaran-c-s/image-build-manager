@@ -44,29 +44,33 @@ from .host_func import get_module_root, load_test_config
 
 
 def _get_report_dir() -> str:
-    """Get the report output directory from test_config.yml or default."""
+    """Get the report output directory from test_config.yml.
+
+    Supports both relative (to test/) and absolute paths.
+    Creates the directory tree if it does not exist.
+    """
     config = load_test_config()
-    report_path = config.get("report_path", "")
-    if report_path and os.path.isabs(report_path):
-        os.makedirs(report_path, exist_ok=True)
-        return report_path
-    report_dir = os.path.join(get_module_root(), report_path or "reports")
+    report_path = config["report_path"]
+    if os.path.isabs(str(report_path)):
+        report_dir = str(report_path)
+    else:
+        report_dir = os.path.join(get_module_root(), str(report_path))
     os.makedirs(report_dir, exist_ok=True)
     return report_dir
 
 
 def _get_report_name() -> str:
-    """Get the report file basename from test_config.yml or default."""
+    """Get the report file basename from test_config.yml."""
     config = load_test_config()
-    return config.get("report_name", "test_report")
+    return config["report_name"]
 
 
 def _get_server_info() -> Dict[str, str]:
     """Get current server IP and hostname from test_config.yml."""
     try:
         config = load_test_config()
-        ip = config.get("oim_server_ip", "") or "localhost"
-        hostname = config.get("oim_hostname", "")
+        ip = config["oim_server_ip"] or "localhost"
+        hostname = config.get("oim_hostname", "")  # optional
         if not hostname:
             try:
                 hostname = socket.gethostbyaddr(ip)[0] if ip != "localhost" else "localhost"

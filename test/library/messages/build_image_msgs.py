@@ -28,6 +28,9 @@ TEST_NAMES = {
     "deploy_playbook": (
         "Deploy: image_build_manager.yml --tags {tag}"
     ),
+    "deploy_playbook_full": (
+        "Deploy: image_build_manager.yml (default: prepare + build)"
+    ),
 
     # Storage backend
     "storage_backend": (

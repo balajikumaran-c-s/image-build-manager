@@ -64,11 +64,11 @@ run_validation.sh <scenario> <command> [--marker <expr>]
                        │          ├── verify  → verify only (no deploy)
                        │          └── test    → deploy + verify (combined)
                        │
-                       ├── image_builder         → fvt/image_builder/
-                       ├── image_build_validate  → fvt/image_build_validate/
-                       ├── image_build_prepare   → fvt/image_build_prepare/
-                       ├── image_build_build     → fvt/image_build_build/
-                       └── image_build_cleanup   → fvt/image_build_cleanup/
+                       ├── image_build_manager   → fvt/image_build_manager/
+                       ├── validate              → fvt/validate/
+                       ├── prepare               → fvt/prepare/
+                       ├── build                 → fvt/build/
+                       └── cleanup               → fvt/cleanup/
 ```
 
 ### 3.2 Config Mode: `run_validation.sh --config`
@@ -77,10 +77,10 @@ Reads `test_run_config.yml` and runs enabled scenarios in order:
 
 ```yaml
 scenarios:
-  image_builder:
+  image_build_manager:
     order: 1
     run: true
-    suite: image_builder
+    suite: ""
     marker: "sanity"
 ```
 
@@ -88,11 +88,11 @@ scenarios:
 
 | Playbook Tag | Test Scenario | What It Verifies |
 |-------------|---------------|------------------|
-| `validate` | `image_build_validate` | Input config exists, credentials synced |
-| `prepare` | `image_build_prepare` | Containers running, S3 buckets, ports |
-| `build` | `image_build_build` | S3 images, registry images, build_status |
-| `cleanup` | `image_build_cleanup` | Containers removed, artifacts cleaned |
-| *(all)* | `image_builder` | Full verification (no deploy) |
+| `validate` | `validate` | Input config exists, credentials synced |
+| `prepare` | `prepare` | Containers running, S3 buckets, ports |
+| `build` | `build` | S3 images, registry images, build_status |
+| `cleanup` | `cleanup` | Containers removed, artifacts cleaned |
+| *(none — default)* | `image_build_manager` | Full end-to-end (deploy + verify) |
 
 ---
 
@@ -101,12 +101,14 @@ scenarios:
 ### Phase 1: Session Setup (conftest.py)
 
 ```
-1. Load test_config.yml
+1. Validate test_config.yml (all required fields, dataset exists, paths valid)
+   → Fail fast with clear error if invalid (no fallback defaults)
 2. Encrypt test_creds.yml (if not already encrypted)
 3. Clone/pull repo on target (if remote mode)
-4. Sync dataset input files to target
-5. Sync config.yml to target
-6. Initialize TestReport
+4. Sync dataset input/ files to target (sync_image_build_input)
+5. Sync config.yml to target clone root
+6. Sync repo_manager_output/ to target (sync_output)
+7. Initialize TestReport
 ```
 
 ### Phase 2: Deploy (deploy command)
@@ -139,19 +141,19 @@ scenarios:
 
 ## 5. Test Case Registry
 
-### image_build_validate (Tag: validate) — 3 Tests
+### validate (Tag: validate) — 3 Tests
 
 | ID | Test | Markers | Suite |
 |----|------|---------|-------|
-| TC_VL_001 | Deploy playbook --tags validate | deploy, sanity | deploy |
+| TC_VL_001 | Deploy playbook --tags validate | deploy, sanity | *(root)* |
 | TC_VL_002 | Verify image_build_config.yml exists on target | sanity | status |
 | TC_VL_003 | Verify credentials file present on target | sanity | status |
 
-### image_build_prepare (Tag: prepare) — 8 Tests
+### prepare (Tag: prepare) — 8 Tests
 
 | ID | Test | Markers | Suite |
 |----|------|---------|-------|
-| TC_PR_001 | Deploy playbook --tags prepare | deploy, sanity | deploy |
+| TC_PR_001 | Deploy playbook --tags prepare | deploy, sanity | *(root)* |
 | TC_PR_002 | Verify S3 storage backend (MinIO) running | sanity | container |
 | TC_PR_003 | Verify registry container running | sanity | container |
 | TC_PR_004 | Verify systemd services active | sanity | container |
@@ -160,22 +162,22 @@ scenarios:
 | TC_PR_007 | Verify registry reachable | sanity | container |
 | TC_PR_008 | Verify S3 buckets created | sanity | s3 |
 
-### image_build_build (Tag: build) — 6 Tests
+### build (Tag: build) — 6 Tests
 
 | ID | Test | Markers | Suite |
 |----|------|---------|-------|
-| TC_BD_001 | Deploy playbook --tags build | deploy, sanity | deploy |
+| TC_BD_001 | Deploy playbook --tags build | deploy, sanity | *(root)* |
 | TC_BD_002 | Verify x86_64 images pushed to S3 | x86_64, sanity | s3 |
 | TC_BD_003 | Verify aarch64 images pushed to S3 | aarch64, sanity | s3 |
 | TC_BD_004 | Verify x86_64 images in registry | x86_64, sanity | registry |
 | TC_BD_005 | Verify build_status.yml after build | sanity | registry |
 | TC_BD_006 | Verify x86_64 functional groups built | x86_64, sanity | registry |
 
-### image_build_cleanup (Tag: cleanup) — 8 Tests
+### cleanup (Tag: cleanup) — 8 Tests
 
 | ID | Test | Markers | Suite |
 |----|------|---------|-------|
-| TC_CL_001 | Deploy playbook --tags cleanup | deploy, sanity | deploy |
+| TC_CL_001 | Deploy playbook --tags cleanup | deploy, sanity | *(root)* |
 | TC_CL_002 | Verify containers removed | sanity | cleanup |
 | TC_CL_003 | Verify systemd services stopped | sanity | cleanup |
 | TC_CL_004 | Verify firewall ports closed | sanity | cleanup |
@@ -184,10 +186,11 @@ scenarios:
 | TC_CL_007 | Verify build_status.yml removed | sanity | cleanup |
 | TC_CL_008 | Verify registry has no images | sanity | cleanup |
 
-### image_builder (Full Verification) — 12 Tests
+### image_build_manager (Full End-to-End) — 13 Tests
 
 | ID | Test | Markers | Suite |
 |----|------|---------|-------|
+| TC_IB_000 | Deploy image_build_manager.yml (no tags) | deploy, sanity | *(root)* |
 | TC_IB_001 | Verify S3 storage backend (MinIO) | x86_64, aarch64, sanity | container |
 | TC_IB_002 | Verify registry container running | x86_64, aarch64, sanity | container |
 | TC_IB_003 | Verify required S3 buckets exist | x86_64, aarch64, sanity | s3 |
@@ -201,7 +204,7 @@ scenarios:
 | TC_IB_011 | Verify packages in x86_64 S3 images | x86_64, sanity | image_verification |
 | TC_IB_012 | Verify packages in aarch64 S3 images | aarch64, sanity | image_verification |
 
-**Total: 37 test cases across 5 scenarios.**
+**Total: 38 test cases across 5 scenarios.**
 
 ---
 
@@ -210,7 +213,7 @@ scenarios:
 ### 6.1 Input Flow
 
 ```
-test/datasets/project_default/input/    (local — automation runner)
+test/datasets/data_set_01/input/         (local — automation runner)
         │
         │  rsync via conftest.py (when sync_image_build_input: true)
         ▼
@@ -224,18 +227,17 @@ test/datasets/project_default/input/    (local — automation runner)
 ### 6.2 Dataset Structure
 
 ```
-datasets/project_default/
-├── config.yml                          # Project config (hostname, domain, etc.)
-└── input/                              # All files synced to target
-    ├── image_build_config.yml          # Domain input config
-    ├── image_build_credentials.yml     # Vault-encrypted credentials
-    ├── .image_build_credentials_key    # Vault password file
-    └── repo_manager_output/            # Upstream dependency output
-        ├── repo_status.yml             # RPM repo URLs, certs
-        ├── functional_group_packages.yml
-        └── certs/
-            ├── pulp_webserver.crt
-            └── pulp_webserver.key
+datasets/data_set_01/
+├── input/                              # Synced to <clone_path>/src/input/<project>/
+│   ├── config.yml                      # Project config (also -> <clone_path>/config.yml)
+│   ├── image_build_config.yml          # Domain input config
+│   └── image_build_credentials.yml     # Vault-encrypted credentials
+└── repo_manager_output/                # Synced to repo_manager_output_dir (sync_output: true)
+    ├── repo_status.yml                 # RPM repo URLs, certs
+    ├── functional_group_packages.yml
+    └── certs/
+        ├── pulp_webserver.crt
+        └── pulp_webserver.key
 ```
 
 ---
@@ -297,12 +299,45 @@ Same Machine
 
 ---
 
-## 10. Extensibility
+## 10. Configuration Validation
+
+### 10.1 No Fallback Defaults
+
+All required fields in `test_config.yml` must be explicitly set. The framework
+never silently substitutes a default value. If a field is missing or `null`,
+session startup fails immediately with a clear error listing every missing field.
+
+**Required fields:** `oim_server_ip`, `dataset`, `project_name`, `clone_path`,
+`shared_path`, `report_path`, `report_name`.
+
+### 10.2 Dataset Validation
+
+Before tests run, the validator checks:
+- Dataset directory exists: `datasets/<dataset>/`
+- Required files present: `input/config.yml`, `input/image_build_config.yml`,
+  `input/image_build_credentials.yml`
+
+### 10.3 Report Path
+
+`report_path` supports both relative (to `test/`) and absolute paths.
+Directories are created automatically if they do not exist.
+
+### 10.4 Tab Completion
+
+```bash
+eval "$(./run_validation.sh --completion)"
+```
+
+Enables bash tab completion for scenarios, commands, `--suite`, and `--marker`.
+
+---
+
+## 11. Extensibility
 
 ### Adding a New Test Scenario
 
 1. Create `fvt/<scenario_name>/` directory
-2. Add `deploy/test_deploy.py` for playbook execution
+2. Add `test_playbook.py` at scenario root for playbook execution
 3. Add `<component>/test_<component>.py` for verification
 4. Add test names/messages to `build_image_msgs.py`
 5. Add scenario to `test_run_config.yml`

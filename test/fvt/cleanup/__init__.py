@@ -11,8 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
----
 
-# SSH password for the target server (auto-encrypted with Ansible Vault on first run).
-# Set this value then run any test — it will be encrypted automatically.
-oim_password: ""
+"""
+Cleanup scenario — ansible-playbook image_build_manager.yml --tags cleanup.
+
+Removes all deployed resources: containers, systemd services,
+S3 buckets, s3cmd config, build output, and registry images.
+
+Suites:
+    cleanup/  — TC_CL_002-008: Verify all artifacts removed
+"""
