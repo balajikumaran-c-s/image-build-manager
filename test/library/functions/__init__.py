@@ -50,7 +50,7 @@ from .report_func import (
 )
 
 # --- Runner ---
-from .runner_func import PlaybookRunner
+from .runner_func import run_playbook
 
 # --- Build Image verification ---
 from .build_image_func import (
@@ -81,4 +81,11 @@ from .build_image_func import (
     check_registry_reachable,
     # Validate extended
     check_input_config_exists,
+)
+
+# --- Validation ---
+from .validation_func import (
+    validate_test_config,
+    validate_all,
+    ConfigValidationError,
 )

@@ -20,7 +20,7 @@ TC_PR_001: Deploy image_build_manager --tags prepare
 
 import pytest
 
-from library.functions import TestLogger, PlaybookRunner
+from library.functions import TestLogger, run_playbook
 from library.messages import (
     TEST_NAMES,
     TEST_LOG_MSGS as LOG,
@@ -34,8 +34,7 @@ from library.messages import (
 def test_deploy_prepare(host):
     """TC_PR_001: Deploy image_build_manager --tags prepare."""
     tl = TestLogger(TEST_NAMES["deploy_playbook"].format(tag="prepare"), "TC_PR_001")
-    runner = PlaybookRunner()
-    result = runner.run(tag="prepare")
+    result = run_playbook(tag="prepare")
 
     if result["success"]:
         tl.passed(LOG["playbook_success"].format(

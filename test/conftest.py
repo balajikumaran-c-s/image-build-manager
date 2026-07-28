@@ -50,7 +50,7 @@ from library.functions.host_func import (
     sync_repo_manager_output,
 )
 from library.functions.formatting_func import log
-from library.validation.functions.validation_func import (
+from library.functions.validation_func import (
     validate_all,
     ConfigValidationError,
 )
@@ -253,21 +253,20 @@ def pytest_sessionstart(session):
 
 
 def pytest_sessionfinish(session, exitstatus):
-    """Save report after all tests complete."""
+    """Save report and print summary table after all tests complete."""
     report = get_current_report()
     if report and report.results:
         report.save()
 
+    # Print summary table
+    _print_summary_table(session)
+
 
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Capture test results and output for the HTML report."""
+    """Capture test results and output for the HTML report + summary."""
     outcome = yield
     result = outcome.get_result()
-
-    report = get_current_report()
-    if not report:
-        return
 
     if result.when not in {"call", "setup"}:
         return
@@ -298,13 +297,89 @@ def pytest_runtest_makereport(item, call):
             + f"SKIPPED: {skip_reason}"
         )
 
-    report.add_result({
+    # Accumulate for summary table (always)
+    _SESSION_RESULTS.append({
         "test_name": item.name,
         "status": status,
         "duration": getattr(result, "duration", 0),
-        "details": details,
-        "error": str(result.longrepr) if result.failed else "",
     })
+
+    # Store in HTML/JSON report
+    report = get_current_report()
+    if report:
+        report.add_result({
+            "test_name": item.name,
+            "status": status,
+            "duration": getattr(result, "duration", 0),
+            "details": details,
+            "error": str(result.longrepr) if result.failed else "",
+        })
+
+
+# =============================================================================
+# SUMMARY TABLE
+# =============================================================================
+
+_SESSION_RESULTS = []
+
+
+def _print_summary_table(session):
+    """Print a summary table of all test results."""
+    if not _SESSION_RESULTS:
+        return
+
+    passed = [r for r in _SESSION_RESULTS if r["status"] == "PASSED"]
+    failed = [r for r in _SESSION_RESULTS if r["status"] == "FAILED"]
+    skipped = [r for r in _SESSION_RESULTS if r["status"] == "SKIPPED"]
+    total = len(_SESSION_RESULTS)
+
+    sep = "=" * 70
+    print(f"\n{sep}")
+    print("  TEST EXECUTION SUMMARY")
+    print(sep)
+    print(f"  {'Test Name':<45} {'Status':<10} {'Duration':>8}")
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 8}")
+
+    for r in _SESSION_RESULTS:
+        name = r["test_name"]
+        if len(name) > 44:
+            name = name[:41] + "..."
+        status = r["status"]
+        dur = f"{r['duration']:.2f}s"
+        if status == "PASSED":
+            tag = f"\033[32m{status}\033[0m"
+        elif status == "FAILED":
+            tag = f"\033[31m{status}\033[0m"
+        else:
+            tag = f"\033[33m{status}\033[0m"
+        print(f"  {name:<45} {tag:<19} {dur:>8}")
+
+    print(f"  {'-' * 45} {'-' * 10} {'-' * 8}")
+    total_dur = sum(r["duration"] for r in _SESSION_RESULTS)
+    print(
+        f"  \033[32m{len(passed)} passed\033[0m, "
+        f"\033[31m{len(failed)} failed\033[0m, "
+        f"\033[33m{len(skipped)} skipped\033[0m "
+        f"/ {total} total "
+        f"({total_dur:.2f}s)"
+    )
+    print(sep)
+    print()
+
+
+# =============================================================================
+# SUPPRESS PYTEST DOT OUTPUT (TestLogger already provides detail)
+# =============================================================================
+
+def pytest_report_teststatus(report, config):
+    """Replace pytest's default . s F characters with empty strings."""
+    if report.when == "call":
+        if report.passed:
+            return "passed", "", ""
+        elif report.failed:
+            return "failed", "", ""
+    if report.skipped:
+        return "skipped", "", ""
 
 
 # =============================================================================

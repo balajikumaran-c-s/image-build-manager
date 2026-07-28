@@ -1,90 +1,34 @@
 # Test Automation — Design & Architecture
 
-> **Domain**: `image_build_manager` | **Last Updated**: Jul 2026
+> **Domain**: `image_build_manager` | **Version**: 2.0 | **Last Updated**: Jul 2026
 
 ---
 
 ## 1. Overview
 
-The test automation framework provides **Functional Verification Testing (FVT)** for the
-`image_build_manager` domain. It verifies that the Ansible playbook correctly deploys
-infrastructure (MinIO, registry), builds OS images, and produces valid output artifacts.
+### 1.1 Purpose
 
-### Design Goals
+This document describes the test automation architecture for the **image_build_manager**
+module. The framework provides Functional Verification Testing (FVT) that validates
+the Ansible playbook correctly deploys infrastructure (MinIO, registry), builds OS
+images, and produces valid output artifacts on a target server.
 
-- **Zero hardcoded values** — all IPs, paths, and credentials read from config
-- **Centralized messages** — no inline strings in test files
-- **Graceful skipping** — optional features skip cleanly (no false failures)
-- **Structured output** — TestLogger produces consistent ✓/✗ formatted results
-- **HTML reports** — consolidated report across multiple scenario runs
-- **Remote + local** — tests run against a remote OIM server or locally
+### 1.2 Design Principles
 
----
+| # | Principle | Implementation |
+|---|-----------|----------------|
+| P1 | **No fallback defaults** | All config fields required. Session fails fast with clear error listing every missing field |
+| P2 | **Strict separation** | Messages in `messages/`, constants in `vars/`, logic in `functions/`, tests only call + assert |
+| P3 | **Zero hardcoded values** | All IPs, paths, credentials read from config files |
+| P4 | **Graceful skipping** | Optional features (aarch64) skip cleanly — no false failures |
+| P5 | **Remote + local** | Same tests run against remote server (SSH) or locally (subprocess) |
+| P6 | **Structured output** | TestLogger produces consistent ✓/✗ formatted results |
+| P7 | **Consolidated reports** | HTML + JSON reports merge across multiple scenario runs |
+| P8 | **Deploy + Verify lifecycle** | Every scenario has `test_playbook.py` (deploy) + `<area>/test_<area>.py` (verify) |
 
-## 2. Architecture
+### 1.3 Scope
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        TEST AUTOMATION ARCHITECTURE                         │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  ┌──────────────┐     ┌──────────────┐     ┌──────────────────────────────┐
-  │ run_validation│     │  conftest.py  │     │       Target Server          │
-  │    .sh       │────>│  pytest hooks │────>│  (OIM / image_build_manager) │
-  │              │     │  + fixtures   │     │                              │
-  └──────┬───────┘     └──────┬───────┘     └──────────────────────────────┘
-         │                    │                          ▲
-         │                    │                          │ SSH / testinfra
-         │                    ▼                          │
-         │             ┌──────────────┐           ┌─────┴──────┐
-         │             │  fvt/        │           │  library/   │
-         │             │  test files  │──────────>│  functions/ │
-         │             │              │           │  vars/      │
-         │             └──────────────┘           │  messages/  │
-         │                                        └────────────┘
-         │
-         ▼
-  ┌──────────────┐     ┌──────────────┐
-  │ test_config  │     │ test_run     │
-  │   .yml       │     │  _config.yml │
-  │ (connection) │     │ (scenarios)  │
-  └──────────────┘     └──────────────┘
-```
-
----
-
-## 3. Execution Flow
-
-### 3.1 Entry Point: `run_validation.sh`
-
-```
-run_validation.sh <scenario> <command> [--marker <expr>]
-                       │          │
-                       │          ├── deploy  → run playbook + verify
-                       │          ├── verify  → verify only (no deploy)
-                       │          └── test    → deploy + verify (combined)
-                       │
-                       ├── image_build_manager   → fvt/image_build_manager/
-                       ├── validate              → fvt/validate/
-                       ├── prepare               → fvt/prepare/
-                       ├── build                 → fvt/build/
-                       └── cleanup               → fvt/cleanup/
-```
-
-### 3.2 Config Mode: `run_validation.sh --config`
-
-Reads `test_run_config.yml` and runs enabled scenarios in order:
-
-```yaml
-scenarios:
-  image_build_manager:
-    order: 1
-    run: true
-    suite: ""
-    marker: "sanity"
-```
-
-### 3.3 Playbook ↔ Test Scenario Mapping
+The framework covers five playbook phases via test scenarios:
 
 | Playbook Tag | Test Scenario | What It Verifies |
 |-------------|---------------|------------------|
@@ -96,252 +40,332 @@ scenarios:
 
 ---
 
-## 4. Test Phases
+## 2. Repository Structure
 
-### Phase 1: Session Setup (conftest.py)
-
-```
-1. Validate test_config.yml (all required fields, dataset exists, paths valid)
-   → Fail fast with clear error if invalid (no fallback defaults)
-2. Encrypt test_creds.yml (if not already encrypted)
-3. Clone/pull repo on target (if remote mode)
-4. Sync dataset input/ files to target (sync_image_build_input)
-5. Sync config.yml to target clone root
-6. Sync repo_manager_output/ to target (sync_output)
-7. Initialize TestReport
-```
-
-### Phase 2: Deploy (deploy command)
+### 2.1 Source Code Layout
 
 ```
-1. PlaybookRunner connects to target (SSH or local)
-2. Runs: ansible-playbook image_build_manager.yml --tags <tag>
-3. Streams live output with | prefix
-4. Returns success/failure dict
+image-build-manager/                    # Repository root
+├── src/                                # Ansible source code
+│   ├── image_build_manager.yml         # Main playbook (tags: validate, prepare, build, cleanup)
+│   ├── input/                          # Input file templates
+│   ├── roles/                          # Ansible roles
+│   ├── playbooks/                      # Sub-playbooks
+│   ├── library/                        # Custom Ansible modules
+│   └── vars/                           # Ansible variables
+├── config.yml                          # Project config (hostname, domain, admin_nic_ip)
+├── docs/design/                        # Design documentation
+└── test/                               # Test automation (this framework)
 ```
 
-### Phase 3: Verify (verify command)
+### 2.2 Test Framework Layout
 
 ```
-1. Testinfra connects to target
-2. Runs verification functions (check_*, verify_*)
-3. TestLogger produces structured output
-4. Results collected by TestReport
-```
-
-### Phase 4: Report Generation
-
-```
-1. conftest.py pytest_sessionfinish hook
-2. TestReport.save() → JSON + HTML
-3. Multiple runs merge into single report
-```
-
----
-
-## 5. Test Case Registry
-
-### validate (Tag: validate) — 3 Tests
-
-| ID | Test | Markers | Suite |
-|----|------|---------|-------|
-| TC_VL_001 | Deploy playbook --tags validate | deploy, sanity | *(root)* |
-| TC_VL_002 | Verify image_build_config.yml exists on target | sanity | status |
-| TC_VL_003 | Verify credentials file present on target | sanity | status |
-
-### prepare (Tag: prepare) — 8 Tests
-
-| ID | Test | Markers | Suite |
-|----|------|---------|-------|
-| TC_PR_001 | Deploy playbook --tags prepare | deploy, sanity | *(root)* |
-| TC_PR_002 | Verify S3 storage backend (MinIO) running | sanity | container |
-| TC_PR_003 | Verify registry container running | sanity | container |
-| TC_PR_004 | Verify systemd services active | sanity | container |
-| TC_PR_005 | Verify firewall ports open | sanity | container |
-| TC_PR_006 | Verify s3cmd installed and configured | sanity | container |
-| TC_PR_007 | Verify registry reachable | sanity | container |
-| TC_PR_008 | Verify S3 buckets created | sanity | s3 |
-
-### build (Tag: build) — 6 Tests
-
-| ID | Test | Markers | Suite |
-|----|------|---------|-------|
-| TC_BD_001 | Deploy playbook --tags build | deploy, sanity | *(root)* |
-| TC_BD_002 | Verify x86_64 images pushed to S3 | x86_64, sanity | s3 |
-| TC_BD_003 | Verify aarch64 images pushed to S3 | aarch64, sanity | s3 |
-| TC_BD_004 | Verify x86_64 images in registry | x86_64, sanity | registry |
-| TC_BD_005 | Verify build_status.yml after build | sanity | registry |
-| TC_BD_006 | Verify x86_64 functional groups built | x86_64, sanity | registry |
-
-### cleanup (Tag: cleanup) — 8 Tests
-
-| ID | Test | Markers | Suite |
-|----|------|---------|-------|
-| TC_CL_001 | Deploy playbook --tags cleanup | deploy, sanity | *(root)* |
-| TC_CL_002 | Verify containers removed | sanity | cleanup |
-| TC_CL_003 | Verify systemd services stopped | sanity | cleanup |
-| TC_CL_004 | Verify firewall ports closed | sanity | cleanup |
-| TC_CL_005 | Verify S3 buckets removed | sanity | cleanup |
-| TC_CL_006 | Verify s3cmd configuration removed | sanity | cleanup |
-| TC_CL_007 | Verify build_status.yml removed | sanity | cleanup |
-| TC_CL_008 | Verify registry has no images | sanity | cleanup |
-
-### image_build_manager (Full End-to-End) — 13 Tests
-
-| ID | Test | Markers | Suite |
-|----|------|---------|-------|
-| TC_IB_000 | Deploy image_build_manager.yml (no tags) | deploy, sanity | *(root)* |
-| TC_IB_001 | Verify S3 storage backend (MinIO) | x86_64, aarch64, sanity | container |
-| TC_IB_002 | Verify registry container running | x86_64, aarch64, sanity | container |
-| TC_IB_003 | Verify required S3 buckets exist | x86_64, aarch64, sanity | s3 |
-| TC_IB_004 | Verify x86_64 images pushed to S3 | x86_64, sanity | s3 |
-| TC_IB_005 | Verify aarch64 images pushed to S3 | aarch64, sanity | s3 |
-| TC_IB_006 | Verify x86_64 images in registry | x86_64, sanity | registry |
-| TC_IB_007 | Verify aarch64 images in registry | aarch64, sanity | registry |
-| TC_IB_008 | Verify build_status.yml reports success | x86_64, aarch64, sanity | registry |
-| TC_IB_009 | Verify x86_64 functional groups built | x86_64, sanity | registry |
-| TC_IB_010 | Verify aarch64 functional groups built | aarch64, sanity | registry |
-| TC_IB_011 | Verify packages in x86_64 S3 images | x86_64, sanity | image_verification |
-| TC_IB_012 | Verify packages in aarch64 S3 images | aarch64, sanity | image_verification |
-
-**Total: 38 test cases across 5 scenarios.**
-
----
-
-## 6. Data Flow
-
-### 6.1 Input Flow
-
-```
-test/datasets/data_set_01/input/         (local — automation runner)
-        │
-        │  rsync via conftest.py (when sync_image_build_input: true)
-        ▼
-<clone_path>/src/input/project_default/ (target server)
-        │
-        │  ansible-playbook image_build_manager.yml
-        ▼
-/opt/omnia/image_build_manager/output/  (target server — runtime output)
-```
-
-### 6.2 Dataset Structure
-
-```
-datasets/data_set_01/
-├── input/                              # Synced to <clone_path>/src/input/<project>/
-│   ├── config.yml                      # Project config (also -> <clone_path>/config.yml)
-│   ├── image_build_config.yml          # Domain input config
-│   └── image_build_credentials.yml     # Vault-encrypted credentials
-└── repo_manager_output/                # Synced to repo_manager_output_dir (sync_output: true)
-    ├── repo_status.yml                 # RPM repo URLs, certs
-    ├── functional_group_packages.yml
-    └── certs/
-        ├── pulp_webserver.crt
-        └── pulp_webserver.key
+test/
+├── run_validation.sh                   # CLI entry point — scenarios, commands, tab completion
+├── setup_env.sh                        # One-time env setup: venv, deps, completion registration
+├── conftest.py                         # Pytest hooks: validation, sync, fixtures, report
+├── test_config.yml                     # Connection, dataset, sync, report settings
+├── test_creds.yml                      # SSH credentials (auto-encrypted with Vault)
+├── test_run_config.yml                 # Batch execution: scenario order, markers, suites
+├── requirements.txt                    # Python dependencies
+│
+├── docs/                               # Configuration reference
+│   ├── test_config.md
+│   ├── test_creds.md
+│   └── test_run_config.md
+│
+├── datasets/                           # Test input datasets
+│   └── data_set_01/                    # Default dataset
+│       ├── input/                      # Synced → <clone_path>/src/input/<project>/
+│       │   ├── config.yml              # Also synced → <clone_path>/config.yml
+│       │   ├── image_build_config.yml
+│       │   └── image_build_credentials.yml
+│       └── repo_manager_output/        # Synced → repo_manager_output_dir (when sync_output: true)
+│           ├── repo_status.yml
+│           ├── functional_group_packages.yml
+│           └── certs/
+│
+├── library/                            # Reusable automation library
+│   ├── __init__.py                     # Module exports
+│   ├── functions/                      # ALL verification logic
+│   │   ├── host_func.py               # Config, SSH, testinfra, sync
+│   │   ├── build_image_func.py         # S3, registry, container checks
+│   │   ├── runner_func.py              # run_playbook() — subprocess + ansible-playbook execution
+│   │   ├── report_func.py             # HTML + JSON report generation
+│   │   ├── formatting_func.py         # Colors, Symbols, TestLogger
+│   │   └── validation_func.py         # Config validation — fail fast, no defaults
+│   ├── vars/                           # ALL constants
+│   │   ├── common_vars.py             # Paths, commands, ports, containers
+│   │   └── runner_vars.py             # run_playbook defaults, timeouts, SSH options
+│   └── messages/                       # ALL test names, log/assert messages
+│       ├── build_image_msgs.py
+│       └── runner_msgs.py             # run_playbook log/assertion messages
+│
+├── fvt/                                # Functional Verification Tests
+│   ├── TEST_CASES.md                   # Complete test case registry
+│   ├── image_build_manager/            # Full end-to-end (deploy + verify)
+│   │   ├── test_playbook.py            # Deploy — no tags (prepare + build)
+│   │   ├── container/test_containers.py
+│   │   ├── s3/test_s3_images.py
+│   │   ├── registry/test_registry_images.py
+│   │   └── image_verification/test_image_packages.py
+│   ├── validate/                       # --tags validate
+│   │   ├── test_playbook.py
+│   │   └── status/test_status.py
+│   ├── prepare/                        # --tags prepare
+│   │   ├── test_playbook.py
+│   │   ├── container/test_containers.py
+│   │   └── s3/test_s3.py
+│   ├── build/                          # --tags build
+│   │   ├── test_playbook.py
+│   │   ├── s3/test_s3.py
+│   │   └── registry/test_registry.py
+│   └── cleanup/                        # --tags cleanup
+│       ├── test_playbook.py
+│       └── cleanup/test_verify_cleanup.py
+│
+└── reports/                            # Generated HTML + JSON (gitignored)
 ```
 
 ---
 
-## 7. Report Architecture
+## 3. Architecture
 
-### 7.1 Report Generation
+### 3.1 System Architecture
 
 ```
-pytest_sessionstart  → TestReport.__init__()
-pytest_runtest_makereport → TestReport.add_result()
-pytest_sessionfinish → TestReport.save() → JSON + HTML
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        TEST AUTOMATION ARCHITECTURE                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  Automation Runner (local machine)           Target Server (OIM)
+  ─────────────────────────────────           ──────────────────────
+  ┌──────────────────────┐                    ┌───────────────────────────┐
+  │ run_validation.sh    │                    │ image_build_manager.yml   │
+  │  ├── scenario select │                    │  ├── roles/deploy_minio   │
+  │  ├── command routing │                    │  ├── roles/deploy_registry│
+  │  └── pytest invoke   │                    │  ├── roles/image_creation │
+  └──────────┬───────────┘                    │  └── roles/cleanup        │
+             │                                └─────────────┬─────────────┘
+             ▼                                              ▲
+  ┌──────────────────────┐           SSH / testinfra        │
+  │ conftest.py          │──────────────────────────────────┤
+  │  ├── validate config │                                  │
+  │  ├── encrypt creds   │    ┌──────────────────────────┐  │
+  │  ├── clone repo      │    │ run_playbook()           │──┘
+  │  ├── sync dataset    │    │  └── ansible-playbook    │
+  │  └── init report     │    │     └── live streaming   │
+  └──────────┬───────────┘    └──────────────────────────┘
+             │
+             ▼
+  ┌──────────────────────┐    ┌──────────────────────────┐
+  │ fvt/<scenario>/      │───>│ library/functions/       │
+  │  ├── test_playbook   │    │  ├── build_image_func    │
+  │  └── <area>/test_*   │    │  ├── host_func           │
+  └──────────────────────┘    │  └── runner_func         │
+                              └──────────────────────────┘
 ```
 
-### 7.2 HTML Report Sections
+### 3.2 Connection Modes
 
-1. **Header** — server info, suite, marker, duration
-2. **Summary** — pass/fail/skip counts
-3. **Folder Breakdown** — results grouped by test folder + suite/marker info
-4. **Test Details** — expandable per-test results with details
-
-### 7.3 Report Merging
-
-Multiple scenario runs with the same `report_id` merge into one report.
-Each run appears as a separate section under the same server.
+| Mode | Config | Host Connection | Playbook Execution | File Sync |
+|------|--------|-----------------|-------------------|-----------|
+| **Remote** | `oim_server_ip: "10.x.x.x"` | `testinfra ssh://<ip>` | `sshpass + ssh` | `rsync` |
+| **Local** | `oim_server_ip: ""` | `testinfra local://` | `subprocess` | `cp / rsync` |
 
 ---
 
-## 8. Connection Architecture
+## 4. Execution Flow
 
-### 8.1 Remote Mode (`oim_server_ip` set)
-
-```
-Automation Runner → SSH → Target Server (OIM)
-                                │
-                                ├── testinfra host = ssh://<ip>
-                                ├── PlaybookRunner = sshpass + ssh
-                                └── rsync for file sync
-```
-
-### 8.2 Local Mode (`oim_server_ip` empty)
+### 4.1 Entry Point: `run_validation.sh`
 
 ```
-Same Machine
-    ├── testinfra host = local://
-    ├── PlaybookRunner = subprocess
-    └── cp/rsync for file sync
+./run_validation.sh <scenario> <command> [options]
+                         │          │         │
+                         │          │         ├── --suite <area>    (directory filter)
+                         │          │         └── --marker <expr>   (pytest marker filter)
+                         │          │
+                         │          ├── deploy   → run playbook only
+                         │          ├── verify   → run verification tests only
+                         │          └── test     → deploy + verify (combined)
+                         │
+                         ├── image_build_manager   → fvt/image_build_manager/
+                         ├── validate              → fvt/validate/
+                         ├── prepare               → fvt/prepare/
+                         ├── build                 → fvt/build/
+                         ├── cleanup               → fvt/cleanup/
+                         ├── all                   → all scenarios sequentially
+                         ├── list                  → list available scenarios
+                         └── --config              → batch from test_run_config.yml
+```
+
+### 4.2 Session Lifecycle
+
+```
+Phase 1 — Session Setup (conftest.py pytest_sessionstart)
+    1. Validate test_config.yml → fail fast if invalid (no fallback defaults)
+    2. Encrypt test_creds.yml (if not already encrypted)
+    3. Clone/pull repo on target (if remote mode + clone_url set)
+    4. Sync dataset input/ → <clone_path>/src/input/<project_name>/
+    5. Sync input/config.yml → <clone_path>/config.yml
+    6. Sync repo_manager_output/ → repo_manager_output_dir (if sync_output: true)
+    7. Initialize TestReport
+
+Phase 2 — Deploy (test_playbook.py — @pytest.mark.deploy)
+    1. run_playbook() connects to target
+    2. Runs: ansible-playbook image_build_manager.yml [--tags <tag>]
+    3. Streams live output with │ prefix
+    4. Returns success/failure dict
+
+Phase 3 — Verify (fvt/<scenario>/<area>/test_*.py)
+    1. Testinfra connects to target
+    2. Calls verification functions (check_*, verify_*)
+    3. TestLogger produces structured ✓/✗ output
+    4. Results collected by TestReport
+
+Phase 4 — Report (conftest.py pytest_sessionfinish)
+    1. TestReport.save() → JSON + HTML
+    2. Multiple runs with same report_id merge into single report
+```
+
+### 4.3 Data Flow
+
+```
+test/datasets/data_set_01/
+    ├── input/                              ──rsync──→  <clone_path>/src/input/<project>/
+    │   └── config.yml                      ──copy───→  <clone_path>/config.yml
+    └── repo_manager_output/                ──rsync──→  <repo_manager_output_dir>/
+                                                              │
+                                                              ▼
+                                                   ansible-playbook image_build_manager.yml
+                                                              │
+                                                              ▼
+                                                   /opt/omnia/image_build_manager/  (runtime output)
 ```
 
 ---
 
-## 9. Security
+## 5. Configuration
 
-- **Credentials**: `test_creds.yml` encrypted with Ansible Vault on first use
-- **Dataset credentials**: `image_build_credentials.yml` vault-encrypted
-- **No secrets in code**: All credentials from config files
-- **No secrets in git**: `.gitignore` excludes vault key files
-- **SSH**: Uses `StrictHostKeyChecking=no` for automation only
+### 5.1 Required Config Fields
+
+All fields must be explicitly set in `test_config.yml`. **No fallback defaults.**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `oim_server_ip` | string | Target server IP (empty = local mode) |
+| `dataset` | string | Dataset folder name under `datasets/` |
+| `project_name` | string | Maps to `<clone_path>/src/input/<project_name>/` |
+| `clone_path` | abs path | Repo location on target server |
+| `shared_path` | abs path | Runtime persistent storage path |
+| `report_path` | string | Report output dir (relative or absolute) |
+| `report_name` | string | Report file basename |
+
+### 5.2 Sync Options
+
+| Flag | Default | What It Syncs |
+|------|---------|---------------|
+| `sync_image_build_input` | `true` | `input/` → target + `config.yml` → clone root |
+| `sync_output` | `false` | `repo_manager_output/` → `repo_manager_output_dir` |
+
+### 5.3 Config Validation
+
+Validation runs at session start before any tests. On failure, pytest exits
+immediately with all errors listed:
+
+- All required fields present and non-null
+- Dataset directory exists with required files
+- Paths are absolute where required
+- IP format valid (if set)
+- `oim_ssh_user` required when remote mode
 
 ---
 
-## 10. Configuration Validation
+## 6. Library Architecture
 
-### 10.1 No Fallback Defaults
+### 6.1 Strict Separation Rules
 
-All required fields in `test_config.yml` must be explicitly set. The framework
-never silently substitutes a default value. If a field is missing or `null`,
-session startup fails immediately with a clear error listing every missing field.
+| Layer | Location | Rule |
+|-------|----------|------|
+| **Messages** | `messages/` | ALL test names, log messages, assertion messages |
+| **Variables** | `vars/` | ALL constants: paths, ports, commands, timeouts |
+| **Functions** | `functions/` | ALL verification logic (return dict pattern) |
+| **Tests** | `fvt/` | Import → call → assert. No business logic |
 
-**Required fields:** `oim_server_ip`, `dataset`, `project_name`, `clone_path`,
-`shared_path`, `report_path`, `report_name`.
+### 6.2 Core Functions
 
-### 10.2 Dataset Validation
+| File | Key Exports | Purpose |
+|------|-------------|---------|
+| `host_func.py` | `get_testinfra_host`, `load_test_config`, `sync_*` | Config, connection, dataset sync |
+| `build_image_func.py` | `check_container_running`, `check_s3_*`, `check_registry_*` | All verification checks |
+| `runner_func.py` | `run_playbook` | Ansible playbook execution via subprocess with live streaming |
+| `report_func.py` | `TestReport` | HTML + JSON report generation |
+| `formatting_func.py` | `TestLogger`, `Colors`, `Symbols` | Structured terminal output |
+| `validation_func.py` | `validate_all`, `ConfigValidationError` | Pre-flight config validation |
 
-Before tests run, the validator checks:
-- Dataset directory exists: `datasets/<dataset>/`
-- Required files present: `input/config.yml`, `input/image_build_config.yml`,
-  `input/image_build_credentials.yml`
+### 6.3 Report Architecture
 
-### 10.3 Report Path
+```
+report_path/
+  └── <report_name>.{json,html}     # Auto-created, supports absolute paths
+```
 
-`report_path` supports both relative (to `test/`) and absolute paths.
-Directories are created automatically if they do not exist.
+- **Header** — server info, suite, marker, duration
+- **Summary** — pass/fail/skip counts
+- **Folder Breakdown** — results grouped by test folder
+- **Test Details** — expandable per-test results
+- **Merge** — same `report_id` across runs merges into one report
 
-### 10.4 Tab Completion
+---
+
+## 7. Security
+
+- **test_creds.yml** — auto-encrypted with Ansible Vault on first run
+- **image_build_credentials.yml** — vault-encrypted in dataset
+- **No secrets in code** — all credentials from config files
+- **No secrets in git** — `.gitignore` excludes `.key` files
+- **SSH** — `StrictHostKeyChecking=no` for automation only
+
+---
+
+## 8. CLI Features
+
+### 8.1 Tab Completion
 
 ```bash
 eval "$(./run_validation.sh --completion)"
 ```
 
-Enables bash tab completion for scenarios, commands, `--suite`, and `--marker`.
+Enables bash tab completion for scenarios, commands, `--suite` values, and `--marker` values.
+Registered automatically by `setup_env.sh`.
+
+### 8.2 Batch Execution
+
+```yaml
+# test_run_config.yml
+scenarios:
+  image_build_manager:
+    order: 1
+    run: true
+    suite: ""
+    marker: "sanity"
+```
+
+Run with: `./run_validation.sh --config`
 
 ---
 
-## 11. Extensibility
+## 9. Extensibility
 
 ### Adding a New Test Scenario
 
 1. Create `fvt/<scenario_name>/` directory
-2. Add `test_playbook.py` at scenario root for playbook execution
-3. Add `<component>/test_<component>.py` for verification
+2. Add `test_playbook.py` at scenario root (deploy with tag)
+3. Add `<area>/test_<area>.py` for verification
 4. Add test names/messages to `build_image_msgs.py`
 5. Add scenario to `test_run_config.yml`
-6. Update this design document
+6. Register TC IDs in `fvt/TEST_CASES.md`
 
 ### Adding a New Verification Check
 
@@ -350,3 +374,17 @@ Enables bash tab completion for scenarios, commands, `--suite`, and `--marker`.
 3. Add messages to `build_image_msgs.py`
 4. Create test in appropriate `fvt/` folder
 5. Run pylint and verify score ≥ 8.7
+
+---
+
+## 10. Test Case Summary
+
+**38 test cases** across 5 scenarios. Full registry in `fvt/TEST_CASES.md`.
+
+| Scenario | Prefix | Count | Playbook Tag |
+|----------|--------|-------|-------------|
+| image_build_manager | TC_IB_ | 13 | *(none — prepare + build)* |
+| validate | TC_VL_ | 3 | `validate` |
+| prepare | TC_PR_ | 8 | `prepare` |
+| build | TC_BD_ | 6 | `build` |
+| cleanup | TC_CL_ | 8 | `cleanup` |

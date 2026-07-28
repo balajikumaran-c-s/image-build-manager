@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Constants for the PlaybookRunner."""
+"""Constants for the run_playbook utility."""
 
 # Ansible settings
 DEFAULT_VERBOSITY: int = 1
 DEFAULT_TIMEOUT: int = 7200  # 2 hours max
 
 # Output formatting
-LINE_WIDTH: int = 100  # Max chars per | line before folding
+LINE_WIDTH: int = 160  # Max visible chars per │ line before folding
 
 # SSH options for remote execution (list form for subprocess calls)
 SSH_OPTIONS: list = [
@@ -29,3 +29,6 @@ SSH_OPTIONS: list = [
     "-o", "ServerAliveInterval=30",
     "-o", "ServerAliveCountMax=10",
 ]
+
+# Logger name shown in TestLogger output
+RUNNER_LOGGER_NAME: str = "playbook_runner"

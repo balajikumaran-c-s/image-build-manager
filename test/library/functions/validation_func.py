@@ -29,11 +29,9 @@ IPV4_PATTERN = re.compile(
     r'(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$'
 )
 
-# Module root: functions/ -> validation/ -> library/ -> test/
+# Module root: functions/ -> library/ -> test/
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-_MODULE_ROOT = os.path.dirname(
-    os.path.dirname(os.path.dirname(_THIS_DIR))
-)
+_MODULE_ROOT = os.path.dirname(os.path.dirname(_THIS_DIR))
 
 
 class ConfigValidationError(Exception):

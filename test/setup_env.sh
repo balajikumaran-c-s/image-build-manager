@@ -114,6 +114,86 @@ fi
 
 echo "  [OK] All dependencies installed"
 
+# =============================================================================
+# REGISTER run_validation FUNCTION AND TAB COMPLETION IN .venv/bin/activate
+# =============================================================================
+# Inject into .venv/bin/activate so that `source .venv/bin/activate` gives:
+#   - run_validation command (no ./ needed)
+#   - Tab completion for run_validation (scenarios + commands + options)
+
+ACTIVATE_SCRIPT="${VENV_DIR}/bin/activate"
+MARKER="# >>> image-build-manager-test >>>"
+MARKER_END="# <<< image-build-manager-test <<<"
+
+# Remove any previous block (idempotent)
+if grep -q "${MARKER}" "${ACTIVATE_SCRIPT}" 2>/dev/null; then
+    sed -i "/${MARKER}/,/${MARKER_END}/d" "${ACTIVATE_SCRIPT}"
+fi
+
+cat >> "${ACTIVATE_SCRIPT}" << 'IBM_ACTIVATE_EOF'
+
+# >>> image-build-manager-test >>>
+# Added by setup_env.sh — shell function and tab-completion
+
+# Shell function so run_validation works without ./
+run_validation() {
+    "${VIRTUAL_ENV%/.venv}/run_validation.sh" "$@"
+}
+
+# Tab-completion for run_validation
+_run_validation_completions() {
+    local cur prev
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local fvt_dir="${VIRTUAL_ENV%/.venv}/fvt"
+    local scenarios=""
+    if [ -d "${fvt_dir}" ]; then
+        for d in "${fvt_dir}"/*/; do
+            [ -d "$d" ] || continue
+            local name
+            name="$(basename "$d")"
+            [ "$name" = "__pycache__" ] && continue
+            scenarios="${scenarios} ${name}"
+        done
+    fi
+    local commands="deploy verify test"
+    local special="all list help --config --help"
+    local options="--suite --marker -v --verbose --debug"
+    local markers="sanity x86_64 aarch64 functional regression deploy"
+    case "$COMP_CWORD" in
+        1) COMPREPLY=( $(compgen -W "${scenarios} ${special}" -- "$cur") ) ;;
+        2)
+            case "$prev" in
+                list|help|--help|-h|--config) COMPREPLY=() ;;
+                *) COMPREPLY=( $(compgen -W "${commands}" -- "$cur") ) ;;
+            esac ;;
+        *)
+            case "$prev" in
+                --suite)
+                    local scenario="${COMP_WORDS[1]}"
+                    local suites=""
+                    if [ -d "${fvt_dir}/${scenario}" ]; then
+                        for d in "${fvt_dir}/${scenario}"/*/; do
+                            [ -d "$d" ] || continue
+                            local name
+                            name="$(basename "$d")"
+                            [ "$name" = "__pycache__" ] && continue
+                            suites="${suites} ${name}"
+                        done
+                    fi
+                    COMPREPLY=( $(compgen -W "${suites}" -- "$cur") ) ;;
+                --marker) COMPREPLY=( $(compgen -W "${markers}" -- "$cur") ) ;;
+                *) COMPREPLY=( $(compgen -W "${options}" -- "$cur") ) ;;
+            esac ;;
+    esac
+}
+complete -F _run_validation_completions run_validation
+
+# <<< image-build-manager-test <<<
+IBM_ACTIVATE_EOF
+
+echo "  [OK] Registered run_validation and tab-completion in venv activate"
+
 echo ""
 echo "================================================================="
 echo "  Environment Ready"
@@ -122,8 +202,8 @@ echo ""
 echo "  Next steps:"
 echo "    source .venv/bin/activate"
 echo "    vi test_config.yml                  # See docs/test_config.md"
-echo "    ./run_validation.sh --help          # Full usage"
-echo "    ./run_validation.sh image_build_manager verify --marker sanity"
+echo "    run_validation --help               # Full usage (no ./ needed)"
+echo "    run_validation image_build_manager verify --marker sanity"
 echo ""
 echo "  Documentation:"
 echo "    docs/test_config.md                 # Configuration reference"

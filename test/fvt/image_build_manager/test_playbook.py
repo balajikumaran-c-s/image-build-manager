@@ -20,7 +20,7 @@ TC_IB_000: Deploy image_build_manager.yml without tags (prepare + build)
 
 import pytest
 
-from library.functions import TestLogger, PlaybookRunner
+from library.functions import TestLogger, run_playbook
 from library.messages import (
     TEST_NAMES,
     TEST_LOG_MSGS as LOG,
@@ -34,8 +34,7 @@ from library.messages import (
 def test_deploy_image_build_manager(host):
     """TC_IB_000: Deploy image_build_manager.yml (default: prepare + build)."""
     tl = TestLogger(TEST_NAMES["deploy_playbook_full"], "TC_IB_000")
-    runner = PlaybookRunner()
-    result = runner.run()
+    result = run_playbook()
 
     if result["success"]:
         tl.passed(LOG["playbook_success"].format(

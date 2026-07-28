@@ -157,10 +157,9 @@ test/
 │       └── repo_manager_output/ # repo_status, packages, certs
 │
 ├── library/                     # Reusable automation library
-│   ├── functions/               # Host, formatting, build image, report, runner
+│   ├── functions/               # Host, formatting, build image, report, runner, validation
 │   ├── vars/                    # Constants, paths, commands
-│   ├── messages/                # Test names, log/assert messages
-│   └── validation/              # Config validation
+│   └── messages/                # Test names, log/assert messages
 │
 └── fvt/                         # Functional Verification Tests
     ├── TEST_CASES.md            # Complete test case registry

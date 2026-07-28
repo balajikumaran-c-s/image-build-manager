@@ -20,7 +20,7 @@ TC_CL_001: Deploy image_build_manager --tags cleanup
 
 import pytest
 
-from library.functions import TestLogger, PlaybookRunner
+from library.functions import TestLogger, run_playbook
 from library.messages import (
     TEST_NAMES,
     TEST_LOG_MSGS as LOG,
@@ -36,8 +36,7 @@ def test_deploy_cleanup(host):
     tl = TestLogger(
         TEST_NAMES["deploy_playbook"].format(tag="cleanup"), "TC_CL_001"
     )
-    runner = PlaybookRunner()
-    result = runner.run(tag="cleanup")
+    result = run_playbook(tag="cleanup")
 
     if result["success"]:
         tl.passed(LOG["playbook_success"].format(

@@ -27,18 +27,16 @@ test/
 │   │   ├── build_image_func.py     # Domain-specific checks
 │   │   ├── host_func.py            # Connection, sync, config loading
 │   │   ├── formatting_func.py      # TestLogger, Colors, Symbols
-│   │   ├── runner_func.py          # PlaybookRunner
+│   │   ├── runner_func.py          # run_playbook()
 │   │   └── report_func.py          # TestReport, HTML generation
 │   ├── vars/                       # Constants and configuration
 │   │   ├── __init__.py
 │   │   ├── common_vars.py          # CMDS dict, paths, ports, retries
-│   │   └── runner_vars.py          # PlaybookRunner constants
-│   ├── messages/                   # All user-facing strings
-│   │   ├── __init__.py
-│   │   └── build_image_msgs.py     # TEST_NAMES, LOG, ASSERT, SKIP
-│   └── validation/                 # Config validation
-│       └── functions/
-│           └── validation_func.py
+│   │   └── runner_vars.py          # run_playbook constants
+│   └── messages/                   # All user-facing strings
+│       ├── __init__.py
+│       ├── build_image_msgs.py     # TEST_NAMES, LOG, ASSERT, SKIP
+│       └── runner_msgs.py          # run_playbook log/assertion messages
 ├── datasets/                       # Input datasets
 │   └── project_default/
 │       ├── config.yml              # Top-level project config

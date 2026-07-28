@@ -377,6 +377,13 @@ def check_s3_bucket_images(
     s3_output = s3_cmd.stdout if s3_cmd.rc == 0 else ""
     s3_files = _parse_s3_listing(s3_output)
 
+    # Display names for image types
+    _TYPE_DISPLAY = {
+        "initramfs": "initramfs",
+        "vmlinuz": "vmlinuz",
+        "rhel": "rootfs",
+    }
+
     results = []
     all_passed = True
 
@@ -392,17 +399,30 @@ def check_s3_bucket_images(
         for img_type in IMAGE_TYPES:
             found = False
             for path, info in s3_files.items():
-                if fg in path and img_type in path:
-                    found = True
-                    group_result["found_images"].append(img_type)
-                    group_result["image_details"].append({
-                        "type": img_type,
-                        "filename": info["filename"],
-                        "full_path": path,
-                        "size": info["size"],
-                        "size_human": _format_size(info["size"]),
-                    })
-                    break
+                if fg not in path:
+                    continue
+                if img_type == "rhel":
+                    # rootfs image lives in boot-images/<fg>/,
+                    # NOT in efi-images/. Skip efi-images paths.
+                    if "efi-images" in path:
+                        continue
+                    if "rhel" not in info["filename"]:
+                        continue
+                elif img_type not in info["filename"]:
+                    continue
+                found = True
+                display_name = _TYPE_DISPLAY.get(
+                    img_type, img_type
+                )
+                group_result["found_images"].append(img_type)
+                group_result["image_details"].append({
+                    "type": display_name,
+                    "filename": info["filename"],
+                    "full_path": path,
+                    "size": info["size"],
+                    "size_human": _format_size(info["size"]),
+                })
+                break
             if not found:
                 group_result["missing_images"].append(img_type)
                 group_result["success"] = False
@@ -605,15 +625,57 @@ def check_build_status_file(host) -> Dict[str, Any]:
     overall = data.get("overall_status", "").lower()
     if overall == "success":
         fg_images = data.get("functional_group_images", [])
+        # Count actual functional groups across all arch blocks
+        all_groups = []
+        for arch_block in fg_images:
+            if isinstance(arch_block, dict):
+                for arch_name, entries in arch_block.items():
+                    if not isinstance(entries, list):
+                        continue
+                    for entry in entries:
+                        if isinstance(entry, dict):
+                            fg_name = entry.get(
+                                "functional_group", ""
+                            )
+                            if fg_name:
+                                all_groups.append({
+                                    "name": fg_name,
+                                    "arch": arch_name,
+                                    "kernel": entry.get(
+                                        "kernel", ""
+                                    ),
+                                    "initrd": entry.get(
+                                        "initrd", ""
+                                    ),
+                                    "image": entry.get(
+                                        "image", ""
+                                    ),
+                                })
+
+        detail_lines = [
+            f"overall_status: success, "
+            f"{len(all_groups)} functional groups built"
+        ]
+        for g in all_groups:
+            detail_lines.append(f"  {g['name']}:")
+            if g["kernel"]:
+                detail_lines.append(
+                    f"    kernel:  {g['kernel'].split('/')[-1]}"
+                )
+            if g["initrd"]:
+                detail_lines.append(
+                    f"    initrd:  {g['initrd'].split('/')[-1]}"
+                )
+            if g["image"]:
+                detail_lines.append(
+                    f"    rootfs:  {g['image'].split('/')[-1]}"
+                )
+
         return {
             "success": True,
             "status": "success",
             "status_path": status_path,
-            "details": (
-                f"overall_status: success, "
-                f"functional_group_images entries: "
-                f"{len(fg_images)}"
-            ),
+            "details": "\n".join(detail_lines),
             "error": None,
             "data": data,
         }
@@ -1098,29 +1160,31 @@ def check_services_removed(host) -> Dict[str, Any]:
 
 
 def check_firewall_ports_removed(host) -> Dict[str, Any]:
-    """Verify firewall ports (9000, 9001, 5000) are closed after cleanup.
+    """Verify service ports are NOT listening after cleanup.
+
+    Checks via ss -tlnp that ports 9000, 9001, 5000 are no longer
+    bound. This is more reliable than firewall-cmd since the playbook
+    uses container port bindings rather than firewall rules.
 
     Returns:
         Dict with 'success', 'open_ports', 'details'.
     """
-    cmd = host.run(CMDS["firewall_list_ports"])
-    if cmd.rc != 0:
-        return {
-            "success": True,
-            "open_ports": [],
-            "details": "firewall-cmd not available (ports assumed closed)",
-        }
-
-    listed = cmd.stdout.strip()
     still_open = []
-    for port in FIREWALL_PORTS:
-        if port in listed:
+
+    for port in LISTENING_PORTS:
+        cmd = host.run(
+            CMDS["ss_listen_port"].format(port=port)
+        )
+        if cmd.rc == 0 and str(port) in cmd.stdout:
             still_open.append(port)
 
     details_lines = []
-    for port in FIREWALL_PORTS:
-        status = "OPEN (should be closed)" if port in still_open else "closed"
-        details_lines.append(f"  {port}: {status}")
+    for port in LISTENING_PORTS:
+        status = (
+            "STILL LISTENING (should be closed)"
+            if port in still_open else "closed"
+        )
+        details_lines.append(f"  {port}/tcp: {status}")
 
     return {
         "success": len(still_open) == 0,

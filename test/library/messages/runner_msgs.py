@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Log and assertion messages for the PlaybookRunner."""
+"""Log and assertion messages for the run_playbook utility."""
 
 from typing import Dict
 
@@ -62,4 +62,6 @@ RUNNER_ASSERT_MSGS: Dict[str, str] = {
         "    Install: dnf install -y sshpass (RHEL)"
         " or apt install -y sshpass (Ubuntu)"
     ),
+    "cancelled": "Playbook cancelled by user (Ctrl+C)",
+    "os_error": "Command execution encountered an OS error",
 }

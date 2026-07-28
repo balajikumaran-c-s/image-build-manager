@@ -148,7 +148,7 @@ run_pytest() {
     echo -e "${YELLOW}-> ${label}...${NC}"
     echo ""
 
-    local pytest_cmd="python3 -m pytest ${test_path} -s --tb=short ${marker_args} ${VERBOSE}"
+    local pytest_cmd="python3 -m pytest ${test_path} -s --tb=short --no-header -q ${marker_args} ${VERBOSE}"
     echo -e "  ${CYAN}Command: ${pytest_cmd}${NC}"
     echo ""
 
@@ -265,46 +265,8 @@ case "$SCENARIO" in
         exit 0
         ;;
     --completion)
-        # Emit bash completion function. Usage:
-        #   eval "$(./run_validation.sh --completion)"
-        cat <<'COMP_EOF'
-_run_validation() {
-    local cur prev words cword
-    _init_completion || return
-
-    local script_dir
-    script_dir="$(cd "$(dirname "${COMP_WORDS[0]}")" 2>/dev/null && pwd)"
-    [[ -z "$script_dir" ]] && script_dir="."
-
-    local commands="deploy verify test"
-    local options="--suite --marker -v --verbose --debug"
-
-    case "$cword" in
-        1)
-            local scenarios
-            scenarios=$(find "${script_dir}/fvt" -mindepth 1 -maxdepth 1 -type d -not -name '__pycache__' -printf '%f ' 2>/dev/null)
-            COMPREPLY=( $(compgen -W "${scenarios} all list --config --help" -- "$cur") )
-            ;;
-        2)
-            COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )
-            ;;
-        *)
-            if [[ "$prev" == "--suite" ]]; then
-                local scenario="${words[1]}"
-                local suites
-                suites=$(find "${script_dir}/fvt/${scenario}" -mindepth 1 -maxdepth 1 -type d -not -name '__pycache__' -printf '%f ' 2>/dev/null)
-                COMPREPLY=( $(compgen -W "${suites}" -- "$cur") )
-            elif [[ "$prev" == "--marker" ]]; then
-                COMPREPLY=( $(compgen -W "sanity x86_64 aarch64 functional regression" -- "$cur") )
-            else
-                COMPREPLY=( $(compgen -W "${options}" -- "$cur") )
-            fi
-            ;;
-    esac
-}
-complete -F _run_validation ./run_validation.sh
-complete -F _run_validation run_validation.sh
-COMP_EOF
+        echo "Tab completion is automatically registered in .venv/bin/activate."
+        echo "Run: source .venv/bin/activate"
         exit 0
         ;;
     all)

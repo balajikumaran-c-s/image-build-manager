@@ -20,7 +20,7 @@ TC_BD_001: Deploy image_build_manager --tags build
 
 import pytest
 
-from library.functions import TestLogger, PlaybookRunner
+from library.functions import TestLogger, run_playbook
 from library.messages import (
     TEST_NAMES,
     TEST_LOG_MSGS as LOG,
@@ -34,8 +34,7 @@ from library.messages import (
 def test_deploy_build(host):
     """TC_BD_001: Deploy image_build_manager --tags build."""
     tl = TestLogger(TEST_NAMES["deploy_playbook"].format(tag="build"), "TC_BD_001")
-    runner = PlaybookRunner()
-    result = runner.run(tag="build")
+    result = run_playbook(tag="build")
 
     if result["success"]:
         tl.passed(LOG["playbook_success"].format(

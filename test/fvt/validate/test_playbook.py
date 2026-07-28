@@ -20,7 +20,7 @@ TC_VL_001: Deploy image_build_manager --tags validate
 
 import pytest
 
-from library.functions import TestLogger, PlaybookRunner
+from library.functions import TestLogger, run_playbook
 from library.messages import (
     TEST_NAMES,
     TEST_LOG_MSGS as LOG,
@@ -36,8 +36,7 @@ def test_deploy_validate(host):
     tl = TestLogger(
         TEST_NAMES["deploy_playbook"].format(tag="validate"), "TC_VL_001"
     )
-    runner = PlaybookRunner()
-    result = runner.run(tag="validate")
+    result = run_playbook(tag="validate")
 
     if result["success"]:
         tl.passed(LOG["playbook_success"].format(

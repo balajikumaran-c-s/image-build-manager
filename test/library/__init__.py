@@ -19,10 +19,9 @@ Provides reusable functions, variables, messages, and validation utilities
 for FVT (Functional Verification Testing) of the image_build_manager domain.
 
 Structure:
-    functions/   - Host connection, config loading, report, runner
+    functions/   - Host connection, config loading, report, runner, validation
     vars/        - Constants, commands, paths
     messages/    - Test names, log/assert messages
-    validation/  - Config validation (functions/, vars/, messages/)
 """
 
 # Functions
@@ -33,14 +32,10 @@ from .functions import (
     load_test_credentials,
     TestLogger,
     TestReport,
-    PlaybookRunner,
+    run_playbook,
     set_current_report,
     get_current_report,
     get_test_output,
-)
-
-# Validation
-from .validation import (
     validate_all,
     ConfigValidationError,
 )
