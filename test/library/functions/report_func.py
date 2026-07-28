@@ -1221,24 +1221,43 @@ class TestReport:
 
         _save_json(report)
 
-        report_name = _get_report_name()
-        html_file = os.path.join(_get_report_dir(), f"{report_name}.html")
-        with open(html_file, 'w', encoding='utf-8') as f:
-            f.write(_generate_html(report))
+        # Use accumulated run-level totals for the banner
+        current_run = next(
+            (r for r in runs if r.get("report_id") == self.report_id),
+            None,
+        )
+        if current_run:
+            run_summary = current_run.get("summary", {})
+            banner_passed = run_summary.get("passed", passed)
+            banner_failed = run_summary.get("failed", failed)
+            banner_skipped = run_summary.get("skipped", skipped)
+            banner_duration = sum(
+                m.get("duration_seconds", 0)
+                for m in current_run.get("modules", [])
+            )
+        else:
+            banner_passed, banner_failed, banner_skipped = passed, failed, skipped
+            banner_duration = duration
 
-        status_color = "\033[92m" if failed == 0 else "\033[91m"
-        reset = "\033[0m"
+        report_name = _get_report_name()
         report_dir = _get_report_dir()
         json_path = os.path.join(report_dir, f"{report_name}.json")
         html_path = os.path.join(report_dir, f"{report_name}.html")
+
+        html_file = os.path.join(report_dir, f"{report_name}.html")
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(_generate_html(report))
+
+        status_color = "\033[92m" if banner_failed == 0 else "\033[91m"
+        reset = "\033[0m"
 
         print(f"\n\u250c{'\u2500'*68}\u2510")
         print(f"\u2502  {'REPORT SAVED':<64} \u2502")
         print(f"\u251c{'\u2500'*68}\u2524")
         print(f"\u2502  {'Server:':<14} {server_ip:<50} \u2502")
         print(f"\u2502  {'Report ID:':<14} {self.report_id:<50} \u2502")
-        print(f"\u2502  {'Duration:':<14} {duration:.2f}s{'':<46} \u2502")
-        print(f"\u2502  {'Results:':<14} {status_color}{passed} passed, {failed} failed{reset}, {skipped} skipped{'':<26} \u2502")
+        print(f"\u2502  {'Duration:':<14} {banner_duration:.2f}s{'':<46} \u2502")
+        print(f"\u2502  {'Results:':<14} {status_color}{banner_passed} passed, {banner_failed} failed{reset}, {banner_skipped} skipped{'':<26} \u2502")
         print(f"\u251c{'\u2500'*68}\u2524")
         print(f"\u2502  JSON: {json_path:<60} \u2502")
         print(f"\u2502  HTML: {html_path:<60} \u2502")
