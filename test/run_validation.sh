@@ -140,6 +140,64 @@ build_pytest_args() {
     echo "$args"
 }
 
+print_combined_summary() {
+    # Print a combined summary table from the OMNIA_RESULTS_FILE JSON
+    local results_file="${1:-${OMNIA_RESULTS_FILE:-}}"
+    if [[ -z "$results_file" || ! -f "$results_file" ]]; then
+        return
+    fi
+    python3 - "$results_file" <<'PYEOF'
+import json, sys
+results_file = sys.argv[1]
+try:
+    with open(results_file) as f:
+        results = json.load(f)
+except (json.JSONDecodeError, OSError):
+    sys.exit(0)
+if not results:
+    sys.exit(0)
+
+passed = [r for r in results if r["status"] == "PASSED"]
+failed = [r for r in results if r["status"] == "FAILED"]
+skipped = [r for r in results if r["status"] == "SKIPPED"]
+total = len(results)
+sep = "=" * 85
+print(f"\n{sep}")
+print("  TEST EXECUTION SUMMARY")
+print(sep)
+hdr = f"  {'TC ID':<12} {'Test Name':<40} {'Status':<10} {'Duration':>8}"
+div = f"  {'-' * 12} {'-' * 40} {'-' * 10} {'-' * 8}"
+print(hdr)
+print(div)
+for r in results:
+    tc = r.get("tc_id", "")
+    name = r["test_name"]
+    if len(name) > 39:
+        name = name[:36] + "..."
+    st = r["status"]
+    dur = f"{r['duration']:.2f}s"
+    if st == "PASSED":
+        tag = f"\033[32m{st}\033[0m"
+    elif st == "FAILED":
+        tag = f"\033[31m{st}\033[0m"
+    else:
+        tag = f"\033[33m{st}\033[0m"
+    print(f"  {tc:<12} {name:<40} {tag:<19} {dur:>8}")
+print(div)
+total_dur = sum(r["duration"] for r in results)
+print(
+    f"  \033[32m{len(passed)} passed\033[0m, "
+    f"\033[31m{len(failed)} failed\033[0m, "
+    f"\033[33m{len(skipped)} skipped\033[0m "
+    f"/ {total} total "
+    f"({total_dur:.2f}s)"
+)
+print(sep)
+print()
+PYEOF
+    rm -f "$results_file"
+}
+
 run_pytest() {
     local test_path="$1"
     local marker_args="$2"
@@ -178,6 +236,8 @@ run_config_mode() {
     fi
 
     export REPORT_ID=$(date '+%Y%m%d%H%M%S')
+    export OMNIA_SUPPRESS_SUMMARY="true"
+    export OMNIA_RESULTS_FILE=$(mktemp /tmp/omnia_results_XXXXXX.json)
 
     echo -e "${BLUE}=================================================================${NC}"
     echo -e "${BLUE}  Batch Execution from test_run_config.yml${NC}"
@@ -228,9 +288,12 @@ print(f'suite_cfg={sc.get(\"suite\", \"\")}')
         fi
     done
 
+    # Combined test-level summary across all scenarios
+    print_combined_summary
+
     echo ""
     echo -e "${BLUE}=================================================================${NC}"
-    echo -e "  Total: ${total}  ${GREEN}Passed: ${passed}${NC}  ${RED}Failed: ${failed}${NC}  ${YELLOW}Skipped: ${skipped}${NC}"
+    echo -e "  Scenarios: ${total}  ${GREEN}Passed: ${passed}${NC}  ${RED}Failed: ${failed}${NC}  ${YELLOW}Skipped: ${skipped}${NC}"
     echo -e "${BLUE}=================================================================${NC}"
     [[ $failed -eq 0 ]] || exit 1
 }
@@ -495,6 +558,10 @@ case "$COMMAND" in
     test)
         FAILED=0
 
+        # Suppress individual pytest summaries; print combined at end
+        export OMNIA_SUPPRESS_SUMMARY="true"
+        export OMNIA_RESULTS_FILE=$(mktemp /tmp/omnia_results_XXXXXX.json)
+
         # Step 1: Deploy
         export OMNIA_COMMAND_TYPE="deploy"
         echo -e "${YELLOW}=================================================================${NC}"
@@ -533,7 +600,9 @@ case "$COMMAND" in
             echo -e "${YELLOW}Skipping verification — deployment failed${NC}"
         fi
 
-        # Summary
+        # Combined summary at the very end
+        print_combined_summary
+
         echo ""
         echo -e "${BLUE}=================================================================${NC}"
         if [[ $FAILED -eq 0 ]]; then
