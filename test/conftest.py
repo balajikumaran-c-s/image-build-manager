@@ -386,6 +386,8 @@ def _do_print_summary(results):
         f"{'-' * 10} {'-' * 8}"
     )
 
+    cyan = "\033[36m"
+    reset = "\033[0m"
     for r in results:
         tc_id = r.get("tc_id", "")
         name = r["test_name"]
@@ -400,7 +402,8 @@ def _do_print_summary(results):
         else:
             tag = f"\033[33m{status}\033[0m"
         print(
-            f"  {tc_id:<12} {name:<40} "
+            f"  {cyan}{tc_id:<12}{reset} {cyan}{name}{reset}"
+            f"{' ' * max(1, 40 - len(name))} "
             f"{tag:<19} {dur:>8}"
         )
 

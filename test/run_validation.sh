@@ -169,6 +169,8 @@ hdr = f"  {'TC ID':<12} {'Test Name':<40} {'Status':<10} {'Duration':>8}"
 div = f"  {'-' * 12} {'-' * 40} {'-' * 10} {'-' * 8}"
 print(hdr)
 print(div)
+cyan = "\033[36m"
+rst = "\033[0m"
 for r in results:
     tc = r.get("tc_id", "")
     name = r["test_name"]
@@ -182,7 +184,8 @@ for r in results:
         tag = f"\033[31m{st}\033[0m"
     else:
         tag = f"\033[33m{st}\033[0m"
-    print(f"  {tc:<12} {name:<40} {tag:<19} {dur:>8}")
+    pad = " " * max(1, 40 - len(name))
+    print(f"  {cyan}{tc:<12}{rst} {cyan}{name}{rst}{pad} {tag:<19} {dur:>8}")
 print(div)
 total_dur = sum(r["duration"] for r in results)
 print(

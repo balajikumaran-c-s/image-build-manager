@@ -1228,7 +1228,9 @@ class TestReport:
 
         status_color = "\033[92m" if failed == 0 else "\033[91m"
         reset = "\033[0m"
-        rdir = os.path.relpath(_get_report_dir(), get_module_root())
+        report_dir = _get_report_dir()
+        json_path = os.path.join(report_dir, f"{report_name}.json")
+        html_path = os.path.join(report_dir, f"{report_name}.html")
 
         print(f"\n\u250c{'\u2500'*68}\u2510")
         print(f"\u2502  {'REPORT SAVED':<64} \u2502")
@@ -1238,8 +1240,6 @@ class TestReport:
         print(f"\u2502  {'Duration:':<14} {duration:.2f}s{'':<46} \u2502")
         print(f"\u2502  {'Results:':<14} {status_color}{passed} passed, {failed} failed{reset}, {skipped} skipped{'':<26} \u2502")
         print(f"\u251c{'\u2500'*68}\u2524")
-        json_path = f"{rdir}/{report_name}.json"
-        html_path = f"{rdir}/{report_name}.html"
         print(f"\u2502  JSON: {json_path:<60} \u2502")
         print(f"\u2502  HTML: {html_path:<60} \u2502")
         print(f"\u2514{'\u2500'*68}\u2518\n")

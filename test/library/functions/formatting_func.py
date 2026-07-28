@@ -31,10 +31,12 @@ def _supports_color() -> bool:
     """Check if terminal supports ANSI colors."""
     if os.environ.get("NO_COLOR"):
         return False
-    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
-        return False
     term = os.environ.get("TERM", "")
     if term == "dumb":
+        return False
+    if os.environ.get("FORCE_COLOR") or os.environ.get("OMNIA_COMMAND_TYPE"):
+        return True
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
         return False
     return True
 
